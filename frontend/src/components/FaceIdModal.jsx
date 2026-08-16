@@ -140,9 +140,11 @@ export default function FaceIdModal({ onClose, onLogin }) {
 
           {(phase === 'loading' || phase === 'scanning' || phase === 'matched') && (
             <div className="text-center space-y-4">
-              <div ref={holderRef} className="w-[240px] h-[240px] mx-auto rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center relative">
-                {phase === 'loading' && <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />}
-                {phase === 'scanning' && <div className="absolute inset-x-0 h-0.5 bg-indigo-500 shadow-[0_0_12px_#6366f1] animate-laser pointer-events-none" />}
+              <div className="w-[240px] h-[240px] mx-auto rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800 relative">
+                {/* Kamera shu bo'sh div ichiga qo'yiladi — React uning ichki tugunlariga tegmaydi (removeChild xatosi bo'lmasin) */}
+                <div ref={holderRef} className="absolute inset-0 flex items-center justify-center" />
+                {phase === 'loading' && <Loader2 className="absolute inset-0 m-auto w-8 h-8 text-indigo-500 animate-spin z-10" />}
+                {phase === 'scanning' && <div className="absolute inset-x-0 top-1/2 h-0.5 bg-indigo-500 shadow-[0_0_12px_#6366f1] animate-laser pointer-events-none z-10" />}
               </div>
               <p className={`text-sm font-semibold flex items-center justify-center gap-2 ${phase === 'matched' ? 'text-emerald-600' : 'text-slate-600 dark:text-slate-300'}`}>
                 {phase === 'matched' ? <CheckCircle2 className="w-5 h-5" /> : phase === 'loading' ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
