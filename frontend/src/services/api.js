@@ -1,0 +1,542 @@
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+
+// /uploads/... kabi nisbiy rasm yo'llarini backend origin bilan to'ldirish
+// (frontend 3000-portda, rasmlar 5000-portda saqlanadi)
+export function resolveImageUrl(src) {
+  if (!src) return ''
+  if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:')) return src
+  if (src.startsWith('/uploads/')) {
+    const origin = API_URL.replace(/\/api\/?$/, '')
+    return `${origin}${src}`
+  }
+  return src
+}
+
+class ApiService {
+  constructor() {
+    this.token = localStorage.getItem('token')
+  }
+
+  setToken(token) {
+    this.token = token
+    localStorage.setItem('token', token)
+  }
+
+  clearToken() {
+    this.token = null
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+  }
+
+  async request(endpoint, options = {}) {
+    const config = {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.token && { Authorization: `Bearer ${this.token}` }),
+        ...options.headers,
+      },
+      ...options,
+    }
+
+    if (config.body && typeof config.body === 'object') {
+      config.body = JSON.stringify(config.body)
+    }
+
+    try {
+      const response = await fetch(`${API_URL}${endpoint}`, config)
+      const data = await response.json()
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          this.clearToken()
+          window.location.href = '/login'
+        }
+        throw new Error(data.message || 'Xatolik yuz berdi')
+      }
+
+      return data
+    } catch (error) {
+      if (error.message === 'Failed to fetch') {
+        throw new Error('Serverga ulanishda xatolik')
+      }
+      throw error
+    }
+  }
+
+  // Auth
+  async login(email, password) {
+    const data = await this.request('/auth/login', {
+      method: 'POST',
+      body: { email, password },
+    })
+    this.setToken(data.data.token)
+    localStorage.setItem('user', JSON.stringify(data.data.user))
+    return data.data
+  }
+
+  async register(userData) {
+    const data = await this.request('/auth/register', {
+      method: 'POST',
+      body: userData,
+    })
+    this.setToken(data.data.token)
+    localStorage.setItem('user', JSON.stringify(data.data.user))
+    return data.data
+  }
+
+  async getProfile() {
+    const data = await this.request('/auth/me')
+    return data.data
+  }
+
+  async updateProfile(profileData) {
+    const data = await this.request('/auth/profile', {
+      method: 'PUT',
+      body: profileData,
+    })
+    return data.data
+  }
+
+  // Products
+  async getProducts(params = {}) {
+    const query = new URLSearchParams(params).toString()
+    const data = await this.request(`/products${query ? `?${query}` : ''}`)
+    return data
+  }
+
+  async getProduct(id) {
+    const data = await this.request(`/products/${id}`)
+    return data.data
+  }
+
+  async createProduct(product) {
+    const data = await this.request('/products', {
+      method: 'POST',
+      body: product,
+    })
+    return data.data
+  }
+
+  async updateProduct(id, product) {
+    const data = await this.request(`/products/${id}`, {
+      method: 'PUT',
+      body: product,
+    })
+    return data.data
+  }
+
+  async deleteProduct(id) {
+    await this.request(`/products/${id}`, { method: 'DELETE' })
+  }
+
+  async getProductCategories() {
+    const data = await this.request('/products/categories')
+    return data.data
+  }
+
+  async getProductStats() {
+    const data = await this.request('/products/stats')
+    return data.data
+  }
+
+  // Orders
+  async getOrders(params = {}) {
+    const query = new URLSearchParams(params).toString()
+    const data = await this.request(`/orders${query ? `?${query}` : ''}`)
+    return data
+  }
+
+  async getOrder(id) {
+    const data = await this.request(`/orders/${id}`)
+    return data.data
+  }
+
+  async createOrder(order) {
+    const data = await this.request('/orders', {
+      method: 'POST',
+      body: order,
+    })
+    return data.data
+  }
+
+  async updateOrderStatus(id, status) {
+    const data = await this.request(`/orders/${id}/status`, {
+      method: 'PUT',
+      body: status,
+    })
+    return data.data
+  }
+
+  async deleteOrder(id) {
+    await this.request(`/orders/${id}`, { method: 'DELETE' })
+  }
+
+  async getOrderStats() {
+    const data = await this.request('/orders/stats')
+    return data.data
+  }
+
+  async getOrderAnalytics(range = '7d') {
+    const data = await this.request(`/orders/analytics?range=${range}`)
+    return data.data
+  }
+
+  // Customers
+  async getCustomers(params = {}) {
+    const query = new URLSearchParams(params).toString()
+    const data = await this.request(`/customers${query ? `?${query}` : ''}`)
+    return data
+  }
+
+  async getCustomer(id) {
+    const data = await this.request(`/customers/${id}`)
+    return data.data
+  }
+
+  async createCustomer(customer) {
+    const data = await this.request('/customers', {
+      method: 'POST',
+      body: customer,
+    })
+    return data.data
+  }
+
+  async updateCustomer(id, customer) {
+    const data = await this.request(`/customers/${id}`, {
+      method: 'PUT',
+      body: customer,
+    })
+    return data.data
+  }
+
+  async deleteCustomer(id) {
+    await this.request(`/customers/${id}`, { method: 'DELETE' })
+  }
+
+  async getCustomerStats() {
+    const data = await this.request('/customers/stats')
+    return data.data
+  }
+
+  async getTopCustomers() {
+    const data = await this.request('/customers/top')
+    return data.data
+  }
+
+  // Invoices
+  async getInvoices(params = {}) {
+    const query = new URLSearchParams(params).toString()
+    const data = await this.request(`/invoices${query ? `?${query}` : ''}`)
+    return data
+  }
+
+  async getInvoice(id) {
+    const data = await this.request(`/invoices/${id}`)
+    return data.data
+  }
+
+  async createInvoice(invoice) {
+    const data = await this.request('/invoices', {
+      method: 'POST',
+      body: invoice,
+    })
+    return data.data
+  }
+
+  async updateInvoiceStatus(id, status) {
+    const data = await this.request(`/invoices/${id}/status`, {
+      method: 'PUT',
+      body: status,
+    })
+    return data.data
+  }
+
+  async deleteInvoice(id) {
+    await this.request(`/invoices/${id}`, { method: 'DELETE' })
+  }
+
+  async getInvoiceStats() {
+    const data = await this.request('/invoices/stats')
+    return data.data
+  }
+
+  // Subscription
+  async getSubscription() {
+    const data = await this.request('/subscription')
+    return data.data
+  }
+
+  async selectTariff(tariff) {
+    const data = await this.request('/subscription/select', {
+      method: 'POST',
+      body: { tariff },
+    })
+    return data.data
+  }
+
+  async payTariff(tariffData) {
+    const data = await this.request('/subscription/pay', {
+      method: 'POST',
+      body: tariffData,
+    })
+    return data.data
+  }
+
+  async confirmPayment(transactionId) {
+    const data = await this.request('/subscription/confirm', {
+      method: 'POST',
+      body: { transactionId },
+    })
+    return data.data
+  }
+
+  async getPaymentHistory() {
+    const data = await this.request('/subscription/payments')
+    return data.data
+  }
+
+  // Admin
+  async getAdminDashboard() {
+    const data = await this.request('/admin/dashboard')
+    return data.data
+  }
+
+  async getAdminUsers(params = {}) {
+    const query = new URLSearchParams(params).toString()
+    const data = await this.request(`/admin/users${query ? `?${query}` : ''}`)
+    return data
+  }
+
+  async getAdminUser(id) {
+    const data = await this.request(`/admin/users/${id}`)
+    return data.data
+  }
+
+  async createAdminUser(userData) {
+    const data = await this.request('/admin/users', {
+      method: 'POST',
+      body: userData,
+    })
+    return data.data
+  }
+
+  async updateAdminUser(id, userData) {
+    const data = await this.request(`/admin/users/${id}`, {
+      method: 'PUT',
+      body: userData,
+    })
+    return data.data
+  }
+
+  async getAdminPayments(params = {}) {
+    const query = new URLSearchParams(params).toString()
+    const data = await this.request(`/admin/payments${query ? `?${query}` : ''}`)
+    return data
+  }
+
+  async getAdminSubscriptions() {
+    const data = await this.request('/admin/subscriptions')
+    return data.data
+  }
+
+  // Cards
+  async getCards() {
+    const data = await this.request('/cards')
+    return data.data
+  }
+
+  async addCard(cardData) {
+    const data = await this.request('/cards', {
+      method: 'POST',
+      body: cardData,
+    })
+    return data.data
+  }
+
+  async setDefaultCard(id) {
+    const data = await this.request(`/cards/${id}/default`, { method: 'PUT' })
+    return data.data
+  }
+
+  async deleteCard(id) {
+    await this.request(`/cards/${id}`, { method: 'DELETE' })
+  }
+
+  // Notifications
+  async getNotifications(params = {}) {
+    const query = new URLSearchParams(params).toString()
+    const data = await this.request(`/notifications${query ? `?${query}` : ''}`)
+    return data
+  }
+
+  async getUnreadCount() {
+    const data = await this.request('/notifications/unread-count')
+    return data.data
+  }
+
+  async markNotificationRead(id) {
+    const data = await this.request(`/notifications/${id}/read`, { method: 'PUT' })
+    return data.data
+  }
+
+  async markAllNotificationsRead() {
+    const data = await this.request('/notifications/read-all', { method: 'PUT' })
+    return data.data
+  }
+
+  async deleteNotification(id) {
+    await this.request(`/notifications/${id}`, { method: 'DELETE' })
+  }
+
+  // Marketplace (OsonBiznes)
+  async getMarketplaceShops(params = {}) {
+    const query = new URLSearchParams(params).toString()
+    const data = await this.request(`/marketplace/shops${query ? `?${query}` : ''}`)
+    return data
+  }
+
+  async getFeaturedShops() {
+    const data = await this.request('/marketplace/shops/featured')
+    return data.data
+  }
+
+  async getMarketplaceProducts(params = {}) {
+    const query = new URLSearchParams(params).toString()
+    const data = await this.request(`/marketplace/products${query ? `?${query}` : ''}`)
+    return data
+  }
+
+  async getMarketplaceCategories() {
+    const data = await this.request('/marketplace/categories')
+    return data.data
+  }
+
+  async getMarketplaceStats() {
+    const data = await this.request('/marketplace/stats')
+    return data.data
+  }
+
+  async getMarketplaceShopDetail(userId) {
+    const data = await this.request(`/marketplace/shop/${userId}`)
+    return data.data
+  }
+
+  async getMarketplaceProfile() {
+    const data = await this.request('/marketplace/profile')
+    return data.data
+  }
+
+  async updateMarketplaceProfile(profileData) {
+    const data = await this.request('/marketplace/profile', {
+      method: 'PUT',
+      body: profileData,
+    })
+    return data.data
+  }
+
+  // ===== Avto ustaxona (WorkOrders) =====
+  async getTodayBoard() {
+    const data = await this.request('/workorders/today')
+    return data.data
+  }
+
+  async getWorkOrders(params = {}) {
+    const query = new URLSearchParams(params).toString()
+    const data = await this.request(`/workorders${query ? `?${query}` : ''}`)
+    return data
+  }
+
+  async createWorkOrder(order) {
+    const data = await this.request('/workorders', { method: 'POST', body: order })
+    return data.data
+  }
+
+  async updateWorkOrderStatus(id, body) {
+    const data = await this.request(`/workorders/${id}/status`, { method: 'PUT', body })
+    return data.data
+  }
+
+  async cancelWorkOrder(id, reason) {
+    const data = await this.request(`/workorders/${id}/cancel`, { method: 'POST', body: { reason } })
+    return data.data
+  }
+
+  async updateWorkOrder(id, body) {
+    const data = await this.request(`/workorders/${id}`, { method: 'PUT', body })
+    return data.data
+  }
+
+  async getMasters() {
+    const data = await this.request('/workorders/masters')
+    return data.data
+  }
+
+  async createMaster(body) {
+    const data = await this.request('/workorders/masters', { method: 'POST', body })
+    return data.data
+  }
+
+  // Public — mijoz mashina holati (login shart emas)
+  async getCarStatus(params = {}) {
+    const query = new URLSearchParams(params).toString()
+    const data = await this.request(`/workorders/status${query ? `?${query}` : ''}`)
+    return data.data
+  }
+
+  // ===== Sartaroshxona (Barbershop marketplace + navbat) =====
+  async getBarbershops() {
+    const data = await this.request('/barbershops')
+    return data.data
+  }
+  async getBarbers() {
+    const data = await this.request('/barbershops/barbers')
+    return data.data
+  }
+  async getBarbershop(ownerId) {
+    const data = await this.request(`/barbershops/${ownerId}`)
+    return data.data
+  }
+  async getBarberSlots(barberId, date) {
+    const data = await this.request(`/barbershops/barbers/${barberId}/slots?date=${date}`)
+    return data.data
+  }
+  async createBooking(body) {
+    const data = await this.request('/bookings', { method: 'POST', body })
+    return data.data
+  }
+  async trackBookings(phone) {
+    const data = await this.request(`/bookings/track?phone=${encodeURIComponent(phone)}`)
+    return data.data
+  }
+  async getBookingsToday() {
+    const data = await this.request('/bookings/today')
+    return data.data
+  }
+  async updateBookingStatus(id, status, paymentMethod) {
+    const data = await this.request(`/bookings/${id}/status`, { method: 'PUT', body: { status, paymentMethod } })
+    return data.data
+  }
+  async delayBarber(barberId, minutes = 15) {
+    const data = await this.request('/bookings/delay', { method: 'POST', body: { barberId, minutes } })
+    return data
+  }
+  async aiParseVoice(text, ownerId) {
+    const data = await this.request('/bookings/ai-parse', { method: 'POST', body: { text, ownerId } })
+    return data.data
+  }
+  async getAIInsights() {
+    const data = await this.request('/bookings/ai-insights')
+    return data.data
+  }
+  async getAIMessage(type, customerName, barberName, timeSlot, delayedMin) {
+    const data = await this.request('/bookings/ai-message', { method: 'POST', body: { type, customerName, barberName, timeSlot, delayedMin } })
+    return data.data
+  }
+  async syncOffline(actions) {
+    const data = await this.request('/bookings/sync', { method: 'POST', body: { actions } })
+    return data
+  }
+}
+
+export const api = new ApiService()
+export default api

@@ -1,0 +1,78 @@
+# OsonBiznes - Docker Compose (MongoDB stack)
+# Ishga tushirish (repo ildizidan):  docker compose -f deploy/docker-compose.yml up -d --build
+# To'xtatish:                        docker compose -f deploy/docker-compose.yml down
+#
+# Kalitlarni deploy/.env faylida yoki muhitda bering (JWT_SECRET, TELEGRAM_BOT_TOKEN).
+# Build context'lar deploy/ papkasiga nisbatan (../backend = repo/backend).
+
+services:
+  # MongoDB (ilova Mongoose ishlatadi — Postgres EMAS)
+  mongo:
+    image: mongo:7
+    container_name: osonbiznes-db
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    # Portni tashqariga ochmaymiz — faqat ichki tarmoqda backend uchun
+    expose:
+      - "27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API (Node/Express + Mongoose)
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: osonbiznes-api
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      MONGODB_URI: mongodb://mongo:27017/osonbiznes
+      # JWT_SECRET MAJBURIY — default yo'q (fail-closed). deploy/.env da bering.
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET majburiy}
+      JWT_EXPIRES_IN: 30d
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      FRONTEND_URL: ${FRONTEND_URL:-https://osonbiznes.uz}
+    expose:
+      - "5000"
+
+  # Frontend (React build + Nginx, API'ga reverse-proxy)
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: osonbiznes-web
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    # TLS/HTTPS tashqi reverse-proxy (Caddy/host nginx/Cloudflare) orqali termalanadi.
+
+  # Telegram bot (Python, faqat REST orqali backend bilan ishlaydi)
+  telegram-bot:
+    build:
+      context: ../telegram-bot
+      dockerfile: Dockerfile
+    container_name: osonbiznes-bot
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      API_URL: http://backend:5000/api
+
+volumes:
+  mongo_data:
+
+
+
+

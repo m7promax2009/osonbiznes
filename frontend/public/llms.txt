@@ -1,0 +1,19 @@
+# OsonBiznes
+
+> OsonBiznes — mahalladagi sartaroshxona uchun onlayn navbat va oddiy CRM. Mijoz sartaroshni tanlaydi, qulay vaqtga bron qiladi va navbatini real vaqtda kuzatadi; usta o'z navbatlarini boshqaradi; salon egasi kunlik hisobot, ustalar va daromadni ko'radi. Hammasi bitta oddiy tizimda + Telegram-bot.
+
+## Platforma
+
+- [Asosiy sahifa](https://osonbiznes.uz/)
+- [Kirish](https://osonbiznes.uz/login)
+- [Salonni tanlash va bron qilish](https://osonbiznes.uz/salon)
+- [Mening navbatim](https://osonbiznes.uz/navbatim)
+
+## Asosiy imkoniyatlar
+
+- Jonli navbat: mijoz navbatgacha necha kishi qolganini real vaqtda ko'radi
+- Onlayn bron: sartarosh → xizmat → bo'sh vaqt tanlab navbat olish
+- Usta kabineti: "Keldi / Bajarildi / Kelmadi" holatlarini belgilash
+- Salon egasi paneli: bugungi navbatlar, ustalar yuklamasi, kunlik daromad hisoboti
+- Telegram-bot orqali navbat olish va kuzatish (@OSSON_BIZNES_BOT)
+- Yoqimsiz holatlar hisobga olingan: mijoz kelmadi, bron bekor qilindi, aloqa uzildi

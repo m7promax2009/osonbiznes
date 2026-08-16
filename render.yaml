@@ -1,0 +1,59 @@
+# Barbero — Render.com Blueprint (backend + frontend + telegram bot)
+# Ma'lumotlar bazasi: MongoDB Atlas (bepul tier) — MONGODB_URI ni dashboard'da kiriting.
+# Deploy: Render → New → Blueprint → shu repo'ni tanlang.
+
+services:
+  # 1) Backend API (Node/Express)
+  - type: web
+    name: barbero-api
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false            # MongoDB Atlas connection string (dashboard'da kiriting)
+      - key: JWT_SECRET
+        generateValue: true    # Render avtomatik kuchli kalit yaratadi
+      - key: JWT_EXPIRES_IN
+        value: 30d
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: FRONTEND_URL
+        sync: false            # frontend URL, masalan: https://barbero-web.onrender.com
+      - key: MONGOMS_DISABLE_POSTINSTALL
+        value: "1"
+
+  # 2) Frontend (React static site)
+  - type: web
+    name: barbero-web
+    runtime: static
+    rootDir: frontend
+    plan: free
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        sync: false            # https://barbero-api.onrender.com/api
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  # 3) Telegram bot (Python worker)
+  - type: worker
+    name: barbero-bot
+    runtime: python
+    rootDir: telegram-bot
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: API_URL
+        sync: false            # https://barbero-api.onrender.com/api
