@@ -21,6 +21,8 @@ async function connectDB() {
       })
       connected = true
       console.log(`✅ MongoDB Atlas connected: ${conn.connection.host}`)
+      // Atlas'da ham demo ma'lumotni ta'minlaymiz (idempotent — mavjud bo'lsa qayta yaratmaydi)
+      await seedDemoData()
       return conn
     } catch (err) {
       console.log(`⚠️ Atlas unavailable: ${err.message}`)
