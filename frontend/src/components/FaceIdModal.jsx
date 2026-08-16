@@ -17,8 +17,10 @@ function loadScript(src) {
 }
 
 export default function FaceIdModal({ onClose, onLogin }) {
-  const savedUrl = MODEL_URL || localStorage.getItem('tm_model_url') || ''
-  const [modelUrl] = useState(savedUrl)
+  // Faqat config'dagi MODEL_URL haqiqiy Teachable Machine rejimini yoqadi.
+  // Aks holda — demo rejim (eski localStorage'dagi URL e'tiborga olinmaydi, chalkashlik bo'lmasin).
+  const [modelUrl] = useState(MODEL_URL || '')
+  useEffect(() => { if (!MODEL_URL) { try { localStorage.removeItem('tm_model_url') } catch (_) {} } }, [])
   const [phase, setPhase] = useState('idle') // idle | loading | scanning | matched | error
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')

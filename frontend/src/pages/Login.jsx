@@ -152,7 +152,7 @@ export default function Login({ onLogin }) {
             </button>
 
             <div className="mt-6 pt-6 border-t border-slate-100 space-y-3">
-              <p className="text-xs text-slate-500 text-center">Demo bilan tez kirish</p>
+              <p className="text-xs text-slate-500 text-center">Xodim demo — panelni ko'rish uchun rolni tanlang</p>
               <div className="grid grid-cols-2 gap-3">
                 <button type="button" onClick={() => { setEmail('barber@salon.uz'); setPassword('barber123') }} className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 transition-all text-xs font-medium text-slate-600 hover:text-indigo-700">
                   <span className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-[10px]">E</span>

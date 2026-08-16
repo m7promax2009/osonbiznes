@@ -94,7 +94,8 @@ export default function SalonLayout({ user, onLogout }) {
           {/* Quick Demo Switcher & Controls */}
           <div className="flex items-center gap-2">
             {/* Quick Demo Role Switch Buttons */}
-            <div className="hidden md:flex items-center bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200/80 dark:border-slate-700/60 text-xs font-semibold">
+            <div className="hidden md:flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200/80 dark:border-slate-700/60 text-xs font-semibold">
+              <span className="pl-1.5 pr-0.5 text-[9px] uppercase tracking-wider text-slate-400 font-bold">Xodim</span>
               <button
                 onClick={() => switchDemoRole('owner')}
                 className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
@@ -119,11 +120,13 @@ export default function SalonLayout({ user, onLogout }) {
                 <Scissors className="w-3.5 h-3.5" />
                 <span>Usta</span>
               </button>
+              <span className="w-px h-5 bg-slate-300 dark:bg-slate-700 mx-0.5" />
+              <span className="px-0.5 text-[9px] uppercase tracking-wider text-slate-400 font-bold">Mijoz</span>
               <Link
                 to="/salon"
                 target="_blank"
                 className="px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition"
-                title="Mijoz band qilish sahifasi"
+                title="Mijoz band qilish sahifasi (yangi oyna)"
               >
                 <Smartphone className="w-3.5 h-3.5" />
                 <span>Mijoz</span>
