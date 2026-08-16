@@ -4,6 +4,7 @@ const router = express.Router()
 const Booking = require('../models/Booking')
 const User = require('../models/User')
 const Product = require('../models/Product')
+const Customer = require('../models/Customer')
 const Notification = require('../models/Notification')
 const { authenticate } = require('../middleware/auth')
 const { rateLimit } = require('../middleware/rateLimit')
@@ -12,6 +13,28 @@ const { escapeRegex } = require('../utils/sanitize')
 const bookLimiter = rateLimit({ windowMs: 60 * 1000, max: 20, message: "Juda ko'p urinish. Birozdan keyin qayta urinib ko'ring." })
 const STATUSES = ['booked', 'arrived', 'done', 'no_show', 'cancelled']
 const DEPOSIT_RATE = 0.15 // navbatni band qilish uchun 15% zalog
+
+// Xizmat davomiyligi (daqiqa) — nom bo'yicha taxminiy, aniq kutish vaqti uchun
+function serviceDuration(name = '') {
+  const s = String(name).toLowerCase()
+  if (/(soqol|beard|ustara|razor|qosh)/.test(s)) return 20
+  if (/(bola|child|kids|maktab)/.test(s)) return 20
+  if (/(fade|kompleks|complex|to'liq|paket|premium|styling|ukladka|tarash)/.test(s)) return 45
+  if (/(soch|hair|klassik|classic|olish|model)/.test(s)) return 30
+  return 30
+}
+
+// Faqat raqamlar (telefon normalizatsiyasi — mijozni bog'lash uchun)
+const phoneKey = (p) => String(p || '').replace(/\D/g, '')
+
+// Mijoz ishonchliligi (no-show tarixidan)
+function reliabilityOf(c) {
+  if (!c) return { level: 'new', noShowRate: 0, completed: 0, noShow: 0 }
+  const finished = (c.completedCount || 0) + (c.noShowCount || 0)
+  const rate = finished > 0 ? Math.round((c.noShowCount / finished) * 100) : 0
+  const level = finished < 2 ? 'new' : rate === 0 ? 'trusted' : rate < 30 ? 'ok' : 'risky'
+  return { level, noShowRate: rate, completed: c.completedCount || 0, noShow: c.noShowCount || 0 }
+}
 
 // ===== PUBLIC: navbat band qilish =====
 router.post('/', bookLimiter, async (req, res) => {
@@ -42,7 +65,7 @@ router.post('/', bookLimiter, async (req, res) => {
       customerPhone: customerPhone.trim(),
       service,
       servicePrice: price,
-      durationMin: 30,
+      durationMin: serviceDuration(service),
       date,
       timeSlot,
       status: 'booked',
@@ -52,7 +75,21 @@ router.post('/', bookLimiter, async (req, res) => {
       queueNumber: dayCount + 1,
       notes: notes || '',
       isVoiceAdded: Boolean(isVoiceAdded),
+      isWalkIn: Boolean(req.body.isWalkIn),
     })
+
+    // Mijozni CRM'ga bog'laymiz (no-show ishonchliligini kuzatish uchun) — idempotent upsert
+    let customerRel = { level: 'new', noShowRate: 0 }
+    try {
+      if (barber.ownerId) {
+        const cust = await Customer.findOneAndUpdate(
+          { userId: barber.ownerId, phone: phoneKey(customerPhone) },
+          { $inc: { bookingsCount: 1 }, $set: { lastOrderDate: new Date() }, $setOnInsert: { name: customerName.trim() } },
+          { new: true, upsert: true }
+        )
+        customerRel = reliabilityOf(cust)
+      }
+    } catch (_) {}
 
     // Salon egasiga bildirishnoma
     try {
@@ -103,15 +140,34 @@ router.get('/track', async (req, res) => {
       status: { $in: ['booked', 'arrived'] },
     }).sort({ date: 1, timeSlot: 1 }).lean()
 
-    // Har biri uchun oldida nechta odam borligini hisoblaymiz
+    // Mijoz ishonchliligi (bir marta, telefon bo'yicha)
+    let rel = { level: 'new', noShowRate: 0 }
+    try {
+      const cust = await Customer.findOne({ phone: phoneKey(phone) }).sort({ updatedAt: -1 }).lean()
+      rel = reliabilityOf(cust)
+    } catch (_) {}
+
+    // Har biri uchun ANIQ kutish vaqti: oldidagi navbatlarning haqiqiy davomiyliklari yig'indisi
     const withQueue = await Promise.all(bookings.map(async (b) => {
-      const ahead = await Booking.countDocuments({
+      const aheadList = await Booking.find({
         barberId: b.barberId,
         date: b.date,
         isActive: true,
         status: { $in: ['booked', 'arrived'] },
         timeSlot: { $lt: b.timeSlot },
-      })
+      }).select('durationMin status arrivedAt').lean()
+
+      // Oldidagilarning xizmat davomiyliklari yig'indisi (30 emas, haqiqiy)
+      let waitMin = aheadList.reduce((s, x) => s + (x.durationMin || 30), 0)
+      // Hozir xizmatда bo'lgan (arrived) mijozning qolgan vaqtini hisobga olamiz
+      const inService = aheadList.find(x => x.status === 'arrived' && x.arrivedAt)
+      if (inService) {
+        const elapsed = Math.floor((Date.now() - new Date(inService.arrivedAt)) / 60000)
+        const remaining = Math.max(0, (inService.durationMin || 30) - elapsed)
+        waitMin = waitMin - (inService.durationMin || 30) + remaining
+      }
+      waitMin = Math.max(0, waitMin + (b.delayedMin || 0))
+
       return {
         id: b._id,
         _id: b._id,
@@ -122,16 +178,17 @@ router.get('/track', async (req, res) => {
         timeSlot: b.timeSlot,
         status: b.status,
         queueNumber: b.queueNumber,
-        peopleAhead: ahead,
-        estimatedWaitMin: ahead * 30 + (b.delayedMin || 0),
+        peopleAhead: aheadList.length,
+        estimatedWaitMin: waitMin,
         delayedMin: b.delayedMin || 0,
         deposit: b.deposit,
         depositPaid: b.depositPaid,
         servicePrice: b.servicePrice,
         customerName: b.customerName,
+        reliability: rel,
       }
     }))
-    res.json({ success: true, data: withQueue })
+    res.json({ success: true, data: withQueue, reliability: rel })
   } catch (error) {
     console.error('Track error:', error)
     res.status(500).json({ success: false, message: 'Server xatoligi' })
@@ -371,6 +428,78 @@ function scope(user, extra = {}) {
   return f
 }
 
+// ===== ANALITIKA: peak soatlar, no-show %, o'rtacha kutish, daromad trendi =====
+router.get('/analytics', async (req, res) => {
+  try {
+    const days = Math.min(30, Math.max(1, Number(req.query.range) || 7))
+    const since = new Date(); since.setDate(since.getDate() - (days - 1))
+    const sinceStr = since.toISOString().slice(0, 10)
+    const base = req.user.role === 'master' ? { barberId: req.user.id } : { ownerId: req.user.id }
+    const list = await Booking.find({ ...base, isActive: true, date: { $gte: sinceStr } }).lean()
+
+    // Peak soatlar (timeSlot dan soat) — faqat ish soatlari 09-19
+    const hourMap = {}
+    for (let h = 9; h <= 19; h++) hourMap[h] = 0
+    for (const b of list) {
+      const h = parseInt((b.timeSlot || '').slice(0, 2), 10)
+      if (h >= 9 && h <= 19) hourMap[h] = (hourMap[h] || 0) + 1
+    }
+    const peakHours = Object.entries(hourMap).map(([h, c]) => ({ hour: `${h}:00`, count: c }))
+    const busiest = peakHours.reduce((a, b) => (b.count > a.count ? b : a), { hour: '-', count: 0 })
+
+    // Status va no-show %
+    const done = list.filter(b => b.status === 'done')
+    const noShow = list.filter(b => b.status === 'no_show')
+    const cancelled = list.filter(b => b.status === 'cancelled')
+    const finished = done.length + noShow.length
+    const noShowRate = finished > 0 ? Math.round((noShow.length / finished) * 100) : 0
+
+    // O'rtacha xizmat/kutish vaqti (haqiqiy arrivedAt→doneAt bo'lsa, aks holda durationMin)
+    const durs = done.map(b => (b.arrivedAt && b.doneAt)
+      ? Math.round((new Date(b.doneAt) - new Date(b.arrivedAt)) / 60000)
+      : (b.durationMin || 30)).filter(x => x > 0 && x < 240)
+    const avgServiceMin = durs.length ? Math.round(durs.reduce((s, x) => s + x, 0) / durs.length) : 30
+
+    // Daromad kunlar bo'yicha
+    const byDay = {}
+    for (const b of done) byDay[b.date] = (byDay[b.date] || 0) + (b.servicePrice || 0)
+    const revenueByDay = []
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i)
+      const ds = d.toISOString().slice(0, 10)
+      revenueByDay.push({ date: ds, label: ds.slice(5), revenue: byDay[ds] || 0 })
+    }
+
+    // Eng ishonchsiz mijozlar (ko'p kelmaganlar)
+    let topNoShow = []
+    try {
+      topNoShow = await Customer.find({ userId: req.user.id, noShowCount: { $gt: 0 } })
+        .sort({ noShowCount: -1 }).limit(5).select('name phone noShowCount completedCount').lean()
+    } catch (_) {}
+
+    res.json({
+      success: true,
+      data: {
+        range: days,
+        totalBookings: list.length,
+        doneCount: done.length,
+        noShowCount: noShow.length,
+        cancelledCount: cancelled.length,
+        noShowRate,
+        avgServiceMin,
+        totalRevenue: done.reduce((s, b) => s + (b.servicePrice || 0), 0),
+        busiestHour: busiest.hour,
+        peakHours,
+        revenueByDay,
+        topNoShow: topNoShow.map(c => ({ name: c.name, phone: c.phone, noShow: c.noShowCount, done: c.completedCount || 0 })),
+      },
+    })
+  } catch (error) {
+    console.error('Analytics error:', error)
+    res.status(500).json({ success: false, message: 'Server xatoligi' })
+  }
+})
+
 // Bugungi board (ega yoki sartarosh)
 router.get('/today', async (req, res) => {
   try {
@@ -423,7 +552,8 @@ router.put('/:id/status', async (req, res) => {
 
     const updateData = { status }
     if (paymentMethod) updateData.paymentMethod = paymentMethod
-    if (status === 'done') updateData.depositPaid = true
+    if (status === 'done') { updateData.depositPaid = true; updateData.doneAt = new Date() }
+    if (status === 'arrived') updateData.arrivedAt = new Date()
 
     const booking = await Booking.findOneAndUpdate(
       scope(req.user, { _id: req.params.id }),
@@ -431,6 +561,19 @@ router.put('/:id/status', async (req, res) => {
       { new: true, runValidators: true }
     )
     if (!booking) return res.status(404).json({ success: false, message: 'Navbat topilmadi' })
+
+    // No-show ishonchliligini yangilaymiz (mijoz tarixiga yoziladi)
+    try {
+      if (status === 'done' || status === 'no_show') {
+        const inc = status === 'done' ? { completedCount: 1 } : { noShowCount: 1 }
+        await Customer.findOneAndUpdate(
+          { userId: booking.ownerId, phone: phoneKey(booking.customerPhone) },
+          { $inc: inc, $setOnInsert: { name: booking.customerName } },
+          { upsert: true }
+        )
+      }
+    } catch (_) {}
+
     res.json({ success: true, data: booking })
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server xatoligi' })

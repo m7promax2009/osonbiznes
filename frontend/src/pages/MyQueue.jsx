@@ -294,7 +294,7 @@ export default function MyQueue() {
             <p className="text-xs text-blue-100 mt-0.5">Navbatingiz yetib kelganda bot orqali xabar olasiz.</p>
           </div>
           <a
-            href="https://t.me/OsonBiznesUzBot"
+            href="https://t.me/OSSON_BIZNES_BOT"
             target="_blank"
             rel="noreferrer"
             className="px-3.5 py-2 rounded-xl bg-white text-indigo-950 font-extrabold text-xs shrink-0 shadow-sm hover:bg-blue-50 transition"

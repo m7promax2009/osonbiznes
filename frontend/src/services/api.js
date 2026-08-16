@@ -512,6 +512,10 @@ class ApiService {
     const data = await this.request('/bookings/today')
     return data.data
   }
+  async getBookingAnalytics(range = 7) {
+    const data = await this.request(`/bookings/analytics?range=${range}`)
+    return data.data
+  }
   async updateBookingStatus(id, status, paymentMethod) {
     const data = await this.request(`/bookings/${id}/status`, { method: 'PUT', body: { status, paymentMethod } })
     return data.data

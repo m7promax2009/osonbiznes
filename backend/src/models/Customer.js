@@ -52,6 +52,10 @@ const customerSchema = new mongoose.Schema({
     default: 0,
   },
   lastOrderDate: Date,
+  // Navbat ishonchliligi — no-show (kelmaslik) tarixini kuzatish
+  bookingsCount: { type: Number, default: 0 },   // jami band qilingan navbatlar
+  completedCount: { type: Number, default: 0 },  // kelib, bajarilgan
+  noShowCount: { type: Number, default: 0 },     // kelmagan (no-show)
   rating: {
     type: Number,
     min: 0,

@@ -34,7 +34,11 @@ const bookingSchema = new mongoose.Schema({
   queueNumber: { type: Number, default: 0 },
   notes: { type: String, default: '' },
   isVoiceAdded: { type: Boolean, default: false },
+  isWalkIn: { type: Boolean, default: false }, // do'konga to'g'ridan-to'g'ri kelgan (bron emas)
   delayedMin: { type: Number, default: 0 },
+  // Haqiqiy vaqt o'lchovlari — aniq kutish vaqti va analitika uchun
+  arrivedAt: { type: Date },
+  doneAt: { type: Date },
   isActive: { type: Boolean, default: true },
 }, { timestamps: true })
 

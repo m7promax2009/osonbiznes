@@ -46,6 +46,8 @@ export default function SalonToday() {
   const [selectedForMessage, setSelectedForMessage] = useState(null)
   const [selectedForReceipt, setSelectedForReceipt] = useState(null)
   const [aiInsights, setAiInsights] = useState(null)
+  const [analytics, setAnalytics] = useState(null)
+  const [anLoading, setAnLoading] = useState(false)
 
   // AI Ovozli kiritish holati
   const [isListening, setIsListening] = useState(false)
@@ -81,6 +83,13 @@ export default function SalonToday() {
     customerName: 'Navbatsiz mijoz',
     paymentMethod: 'cash',
   })
+
+  useEffect(() => {
+    if (activeTab === 'analytics' && !analytics && !anLoading) {
+      setAnLoading(true)
+      api.getBookingAnalytics(7).then(setAnalytics).catch(() => {}).finally(() => setAnLoading(false))
+    }
+  }, [activeTab])
 
   useEffect(() => {
     load()
@@ -394,6 +403,17 @@ export default function SalonToday() {
           >
             <CreditCard className="w-4 h-4" />
             <span>POS Kassa</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition whitespace-nowrap ${
+              activeTab === 'analytics'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/25'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <TrendingUp className="w-4 h-4" />
+            <span>Analitika</span>
           </button>
           <button
             onClick={() => setActiveTab('ai_copilot')}
@@ -1109,6 +1129,99 @@ export default function SalonToday() {
               <Check className="w-5 h-5" /> To'lovni Qabul Qilish & Chek
             </button>
           </form>
+        </div>
+      )}
+
+      {/* ================= TAB: ANALITIKA ================= */}
+      {activeTab === 'analytics' && (
+        <div className="space-y-6">
+          {(anLoading || !analytics) ? (
+            <div className="py-24 text-center text-slate-400">Analitika yuklanmoqda...</div>
+          ) : (
+            <>
+              <p className="text-sm text-slate-500 dark:text-slate-400">So'nggi <b>{analytics.range} kun</b> bo'yicha ma'lumot — qaror qabul qilish uchun.</p>
+
+              {/* Stat kartalar */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5">
+                  <div className="flex items-center gap-2 text-rose-500 mb-1"><AlertTriangle className="w-4 h-4" /><span className="text-xs font-bold uppercase tracking-wide">No-show</span></div>
+                  <p className="text-3xl font-black text-slate-900 dark:text-white">{analytics.noShowRate}%</p>
+                  <p className="text-xs text-slate-400 mt-1">{analytics.noShowCount} ta kelmadi</p>
+                </div>
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5">
+                  <div className="flex items-center gap-2 text-indigo-500 mb-1"><Clock className="w-4 h-4" /><span className="text-xs font-bold uppercase tracking-wide">O'rtacha</span></div>
+                  <p className="text-3xl font-black text-slate-900 dark:text-white">{analytics.avgServiceMin}<span className="text-lg"> min</span></p>
+                  <p className="text-xs text-slate-400 mt-1">bitta mijozga</p>
+                </div>
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5">
+                  <div className="flex items-center gap-2 text-emerald-500 mb-1"><TrendingUp className="w-4 h-4" /><span className="text-xs font-bold uppercase tracking-wide">Daromad</span></div>
+                  <p className="text-2xl font-black text-slate-900 dark:text-white">{formatSom(analytics.totalRevenue)}</p>
+                  <p className="text-xs text-slate-400 mt-1">{analytics.doneCount} xizmat</p>
+                </div>
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5">
+                  <div className="flex items-center gap-2 text-amber-500 mb-1"><Users className="w-4 h-4" /><span className="text-xs font-bold uppercase tracking-wide">Peak soat</span></div>
+                  <p className="text-3xl font-black text-slate-900 dark:text-white">{analytics.busiestHour}</p>
+                  <p className="text-xs text-slate-400 mt-1">eng band vaqt</p>
+                </div>
+              </div>
+
+              {/* Peak soatlar grafigi */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6">
+                <h3 className="font-bold text-slate-900 dark:text-white mb-1">Peak soatlar</h3>
+                <p className="text-xs text-slate-400 mb-5">Qaysi soatда navbat ko'p — usta jadvalini shunga moslang.</p>
+                <div className="flex items-end gap-1.5 h-40">
+                  {analytics.peakHours.map((h) => {
+                    const max = Math.max(1, ...analytics.peakHours.map(x => x.count))
+                    const pct = Math.round((h.count / max) * 100)
+                    const isPeak = h.hour === analytics.busiestHour
+                    return (
+                      <div key={h.hour} className="flex-1 flex flex-col items-center gap-1.5 justify-end h-full">
+                        <span className="text-[10px] font-bold text-slate-500">{h.count || ''}</span>
+                        <div className={`w-full rounded-t-lg transition-all ${isPeak ? 'bg-indigo-600' : 'bg-indigo-200 dark:bg-indigo-900'}`} style={{ height: `${Math.max(3, pct)}%` }} />
+                        <span className="text-[9px] text-slate-400">{h.hour.replace(':00', '')}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Daromad trendi */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6">
+                <h3 className="font-bold text-slate-900 dark:text-white mb-5">Daromad trendi ({analytics.range} kun)</h3>
+                <div className="flex items-end gap-2 h-36">
+                  {analytics.revenueByDay.map((d) => {
+                    const max = Math.max(1, ...analytics.revenueByDay.map(x => x.revenue))
+                    const pct = Math.round((d.revenue / max) * 100)
+                    return (
+                      <div key={d.date} className="flex-1 flex flex-col items-center gap-1.5 justify-end h-full">
+                        <div className="w-full rounded-t-lg bg-gradient-to-t from-emerald-500 to-emerald-400" style={{ height: `${Math.max(2, pct)}%` }} title={formatSom(d.revenue)} />
+                        <span className="text-[9px] text-slate-400">{d.label}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Ishonchsiz mijozlar */}
+              {analytics.topNoShow?.length > 0 && (
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6">
+                  <h3 className="font-bold text-slate-900 dark:text-white mb-1">Ko'p kelmagan mijozlar</h3>
+                  <p className="text-xs text-slate-400 mb-4">Bularga zalog (deposit) talab qiling — no-show'ni kamaytiradi.</p>
+                  <div className="space-y-2">
+                    {analytics.topNoShow.map((c, i) => (
+                      <div key={i} className="flex items-center justify-between py-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900 dark:text-white">{c.name || 'Mijoz'}</p>
+                          <p className="text-xs text-slate-400">{c.phone}</p>
+                        </div>
+                        <span className="text-xs font-bold text-rose-500 bg-rose-50 dark:bg-rose-950/40 px-2.5 py-1 rounded-lg">{c.noShow} marta kelmagan</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 
