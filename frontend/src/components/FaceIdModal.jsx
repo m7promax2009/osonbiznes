@@ -6,7 +6,6 @@ import { MODEL_URL, FACE_MAP, CONFIDENCE, STABLE_FRAMES } from '../config/faceId
 // Demo rejimda kiritiladigan akkaunt (FACE_MAP dagi birinchi klass — salon egasi)
 const DEMO_CLASS = Object.keys(FACE_MAP)[0] || 'Sardor'
 
-// CDN skriptni bir marta yuklash
 function loadScript(src) {
   return new Promise((resolve, reject) => {
     if (document.querySelector(`script[src="${src}"]`)) return resolve()
@@ -17,108 +16,120 @@ function loadScript(src) {
 }
 
 export default function FaceIdModal({ onClose, onLogin }) {
-  // Faqat config'dagi MODEL_URL haqiqiy Teachable Machine rejimini yoqadi.
-  // Aks holda — demo rejim (eski localStorage'dagi URL e'tiborga olinmaydi, chalkashlik bo'lmasin).
+  // Faqat config'dagi MODEL_URL haqiqiy Teachable Machine rejimini yoqadi; aks holda demo.
   const [modelUrl] = useState(MODEL_URL || '')
-  useEffect(() => { if (!MODEL_URL) { try { localStorage.removeItem('tm_model_url') } catch (_) {} } }, [])
   const [phase, setPhase] = useState('idle') // idle | loading | scanning | matched | error
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
-  const holderRef = useRef(null)
-  const stopRef = useRef(null)
+  const videoRef = useRef(null)   // demo kamera (React boshqaradi — xavfsiz)
+  const canvasRef = useRef(null)  // TM uchun (agar MODEL_URL bo'lsa)
+  const streamRef = useRef(null)
   const rafRef = useRef(null)
   const timerRef = useRef(null)
+  const doneRef = useRef(false)
 
-  useEffect(() => () => stopEverything(), [])
+  useEffect(() => {
+    if (!MODEL_URL) { try { localStorage.removeItem('tm_model_url') } catch (_) {} }
+    return () => stopEverything()
+  }, [])
 
   const stopEverything = () => {
+    doneRef.current = true
     if (rafRef.current) cancelAnimationFrame(rafRef.current)
     if (timerRef.current) clearInterval(timerRef.current)
-    if (stopRef.current) { try { stopRef.current() } catch (_) {} }
+    if (streamRef.current) { try { streamRef.current.getTracks().forEach(t => t.stop()) } catch (_) {} }
+    if (videoRef.current) { try { videoRef.current.srcObject = null } catch (_) {} }
   }
 
-  // Boshlash: haqiqiy Teachable Machine modeli bo'lsa — u bilan; bo'lmasa — demo yuz skani
   const begin = () => { modelUrl ? start(modelUrl) : startDemo() }
 
-  // ===== DEMO: kamera + skan animatsiyasi + egaga kirish (model shart emas) =====
+  // ===== DEMO: kamera + skan + egaga kirish (React-boshqariladigan <video>) =====
   const startDemo = async () => {
-    setError(''); setPhase('loading'); setStatus('Kamera ochilmoqda...')
+    setError(''); doneRef.current = false; setPhase('scanning'); setStatus('Kamera ochilmoqda...')
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 240, height: 240 } })
-      const video = document.createElement('video')
-      video.autoplay = true; video.playsInline = true; video.muted = true
-      video.srcObject = stream
-      video.style.width = '240px'; video.style.height = '240px'; video.style.objectFit = 'cover'
-      await video.play().catch(() => {})
-      if (holderRef.current) { holderRef.current.innerHTML = ''; holderRef.current.appendChild(video) }
-      stopRef.current = () => { stream.getTracks().forEach(t => t.stop()) }
-
-      setPhase('scanning'); setStatus('Yuz aniqlanmoqda...')
-      let pct = 58
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 320, height: 320 } })
+      streamRef.current = stream
+      // <video> React tomonidan render qilingan — faqat oqimni ulaymiz
+      const attach = () => {
+        if (doneRef.current) return
+        if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play().catch(() => {}) }
+        else requestAnimationFrame(attach)
+      }
+      attach()
+      setStatus('Yuz aniqlanmoqda...')
+      let pct = 55
       timerRef.current = setInterval(() => {
         pct = Math.min(99, pct + 7 + Math.round(Math.random() * 8))
         setStatus(`Aniqlanmoqda... ${pct}%`)
       }, 320)
-      setTimeout(() => { if (timerRef.current) clearInterval(timerRef.current); finish(DEMO_CLASS) }, 2600)
+      setTimeout(() => { if (timerRef.current) clearInterval(timerRef.current); if (!doneRef.current) finish(DEMO_CLASS) }, 2600)
     } catch (e) {
       setPhase('error')
-      setError(e.name === 'NotAllowedError' ? 'Kameraga ruxsat berilmadi.' : (e.message || 'Kamera ochilmadi'))
+      setError(e.name === 'NotAllowedError' ? 'Kameraga ruxsat berilmadi. Manzil satridagi 🔒 → Kamera → Ruxsat bering.' : (e.message || 'Kamera ochilmadi'))
     }
   }
 
-  // ===== HAQIQIY: Teachable Machine modeli bilan yuzni tanish =====
+  // ===== HAQIQIY: Teachable Machine (faqat MODEL_URL bo'lsa) =====
   const start = async (url) => {
-    setError(''); setPhase('loading'); setStatus('Model yuklanmoqda...')
-    localStorage.setItem('tm_model_url', url)
+    setError(''); doneRef.current = false; setPhase('scanning'); setStatus('Model yuklanmoqda...')
     try {
       await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.7.4/dist/tf.min.js')
       await loadScript('https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js')
       const tmImage = window.tmImage
       if (!tmImage) throw new Error('Teachable Machine kutubxonasi yuklanmadi')
-
       const base = url.endsWith('/') ? url : url + '/'
       const model = await tmImage.load(base + 'model.json', base + 'metadata.json')
 
-      setStatus('Kamera ochilmoqda...')
-      const webcam = new tmImage.Webcam(240, 240, true)
-      await webcam.setup()
-      await webcam.play()
-      if (holderRef.current) { holderRef.current.innerHTML = ''; holderRef.current.appendChild(webcam.canvas) }
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 320, height: 320 } })
+      streamRef.current = stream
+      const attach = () => {
+        if (doneRef.current) return
+        if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play().catch(() => {}) }
+        else return requestAnimationFrame(attach)
+      }
+      attach()
+      setStatus('Yuzingizni kameraga qarating...')
 
-      let stable = 0, lastClass = null, done = false
-      stopRef.current = () => { try { webcam.stop() } catch (_) {} }
-      setPhase('scanning'); setStatus('Yuzingizni kameraga qarating...')
-
+      let stable = 0, lastClass = null
       const loop = async () => {
-        if (done) return
-        webcam.update()
-        const preds = await model.predict(webcam.canvas)
-        let top = preds[0]
-        for (const p of preds) if (p.probability > top.probability) top = p
-        if (top.probability >= CONFIDENCE) {
-          if (top.className === lastClass) stable++; else { lastClass = top.className; stable = 1 }
-          setStatus(`Aniqlanmoqda: ${top.className} (${Math.round(top.probability * 100)}%)`)
-          if (stable >= STABLE_FRAMES) { done = true; return finish(top.className) }
-        } else { stable = 0; lastClass = null }
+        if (doneRef.current || !videoRef.current) return
+        const canvas = canvasRef.current
+        if (canvas && videoRef.current.videoWidth) {
+          canvas.getContext('2d').drawImage(videoRef.current, 0, 0, 224, 224)
+          const preds = await model.predict(canvas)
+          let top = preds[0]
+          for (const p of preds) if (p.probability > top.probability) top = p
+          if (top.probability >= CONFIDENCE) {
+            if (top.className === lastClass) stable++; else { lastClass = top.className; stable = 1 }
+            setStatus(`Aniqlanmoqda: ${top.className} (${Math.round(top.probability * 100)}%)`)
+            if (stable >= STABLE_FRAMES) { return finish(top.className) }
+          } else { stable = 0; lastClass = null }
+        }
         rafRef.current = requestAnimationFrame(loop)
       }
       rafRef.current = requestAnimationFrame(loop)
     } catch (e) {
       setPhase('error')
-      setError(e.message?.includes('Permission') || e.name === 'NotAllowedError' ? 'Kameraga ruxsat berilmadi.' : (e.message || 'Xatolik'))
+      setError(e.name === 'NotAllowedError' ? 'Kameraga ruxsat berilmadi.' : (e.message || 'Xatolik'))
     }
   }
 
   const finish = async (className) => {
-    stopEverything()
+    doneRef.current = true
+    if (timerRef.current) clearInterval(timerRef.current)
+    if (rafRef.current) cancelAnimationFrame(rafRef.current)
     const cred = FACE_MAP[className] || FACE_MAP[DEMO_CLASS]
     if (!cred) { setPhase('error'); setError(`"${className}" uchun akkaunt biriktirilmagan.`); return }
     setPhase('matched'); setStatus(`Xush kelibsiz, ${className}!`)
     try {
       const res = await api.login(cred.email, cred.password)
-      setTimeout(() => onLogin(res.user), 700)
+      // kamerani to'xtatib, keyin kirish (unmount'dан oldin)
+      if (streamRef.current) { try { streamRef.current.getTracks().forEach(t => t.stop()) } catch (_) {} }
+      setTimeout(() => onLogin(res.user), 600)
     } catch (e) { setPhase('error'); setError(e.message) }
   }
+
+  const active = phase === 'loading' || phase === 'scanning' || phase === 'matched'
 
   return (
     <div className="fixed inset-0 z-[70] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in" onClick={() => { stopEverything(); onClose() }}>
@@ -138,16 +149,17 @@ export default function FaceIdModal({ onClose, onLogin }) {
             </div>
           )}
 
-          {(phase === 'loading' || phase === 'scanning' || phase === 'matched') && (
+          {active && (
             <div className="text-center space-y-4">
-              <div className="w-[240px] h-[240px] mx-auto rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800 relative">
-                {/* Kamera shu bo'sh div ichiga qo'yiladi — React uning ichki tugunlariga tegmaydi (removeChild xatosi bo'lmasin) */}
-                <div ref={holderRef} className="absolute inset-0 flex items-center justify-center" />
-                {phase === 'loading' && <Loader2 className="absolute inset-0 m-auto w-8 h-8 text-indigo-500 animate-spin z-10" />}
-                {phase === 'scanning' && <div className="absolute inset-x-0 top-1/2 h-0.5 bg-indigo-500 shadow-[0_0_12px_#6366f1] animate-laser pointer-events-none z-10" />}
+              <div className="w-[240px] h-[240px] mx-auto rounded-2xl overflow-hidden bg-slate-900 relative">
+                <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" />
+                <canvas ref={canvasRef} width={224} height={224} className="hidden" />
+                {phase === 'loading' && <Loader2 className="absolute inset-0 m-auto w-8 h-8 text-white animate-spin" />}
+                {phase === 'scanning' && <div className="absolute inset-x-0 top-1/2 h-0.5 bg-indigo-400 shadow-[0_0_16px_#818cf8] animate-laser pointer-events-none" />}
+                {phase === 'matched' && <div className="absolute inset-0 bg-emerald-500/20 flex items-center justify-center"><CheckCircle2 className="w-16 h-16 text-emerald-400" /></div>}
               </div>
               <p className={`text-sm font-semibold flex items-center justify-center gap-2 ${phase === 'matched' ? 'text-emerald-600' : 'text-slate-600 dark:text-slate-300'}`}>
-                {phase === 'matched' ? <CheckCircle2 className="w-5 h-5" /> : phase === 'loading' ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                {phase === 'matched' ? <CheckCircle2 className="w-5 h-5" /> : <Loader2 className="w-4 h-4 animate-spin" />}
                 {status}
               </p>
             </div>
