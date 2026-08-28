@@ -1,516 +1,689 @@
 """
-Barbero — Sartaroshxona Telegram Boti
-Mijoz: Sartarosh tanlash → Xizmat → Kun va bo'sh vaqt → Navbat band qilish → Jonli navbatni kuzatish.
-Usta: O'zining bugungi navbatlarini ko'rish, "Keldi/Bajarildi/Kelmadi" qilish.
+OsonBiznes Telegram Bot (Python) - Multi-Store Edition
+- Uses REST API for all data (compatible with MongoDB Memory Server)
+- Browse multiple shops from one bot
+- Each shop has its own catalog
+- Customers can switch between shops freely
 """
+
 import os
 import logging
-from datetime import date, timedelta
+import time
+import json
+from datetime import datetime
+from dotenv import load_dotenv
 import requests
-from telegram import (
-    Update,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    ReplyKeyboardMarkup,
-    KeyboardButton,
-)
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    MessageHandler,
-    CallbackQueryHandler,
-    ContextTypes,
-    filters,
-)
+import urllib3
 
-logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
-logger = logging.getLogger("barbero-bot")
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except Exception:
-    pass
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8834863054:AAFFU49S3iJxi8Zr7N-wMSZKVqzJaT02U5s")
+load_dotenv()
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 API_URL = os.getenv("API_URL", "http://localhost:5000/api")
 
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
+)
+logger = logging.getLogger(__name__)
 
-def api_get(path):
+# === CACHING ===
+shop_cache = {"data": None, "timestamp": 0, "ttl": 15}
+product_cache = {}
+
+def api_get(endpoint, timeout=8):
+    """Make GET request to API with error handling"""
     try:
-        r = requests.get(f"{API_URL}{path}", timeout=8)
-        return r.json() if r.ok else None
+        resp = requests.get(f"{API_URL}{endpoint}", timeout=timeout, verify=False)
+        if resp.ok:
+            return resp.json()
+        logger.warning(f"API GET {endpoint} returned {resp.status_code}")
+    except requests.exceptions.Timeout:
+        logger.warning(f"API GET {endpoint} timed out")
+    except requests.exceptions.ConnectionError:
+        logger.warning(f"API GET {endpoint} connection refused")
     except Exception as e:
-        logger.error(f"GET {path}: {e}")
-        return None
+        logger.error(f"API GET {endpoint} error: {e}")
+    return None
 
-
-def api_post(path, data):
+def api_post(endpoint, data, timeout=8):
+    """Make POST request to API with error handling"""
     try:
-        r = requests.post(f"{API_URL}{path}", json=data, timeout=8)
-        return r.json(), r.status_code
+        resp = requests.post(f"{API_URL}{endpoint}", json=data, timeout=timeout, verify=False)
+        return resp.ok, resp.json() if resp.ok else None
+    except requests.exceptions.Timeout:
+        logger.warning(f"API POST {endpoint} timed out")
     except Exception as e:
-        logger.error(f"POST {path}: {e}")
-        return None, 500
+        logger.error(f"API POST {endpoint} error: {e}")
+    return False, None
 
+def get_active_shops():
+    """Get all active shops via public API"""
+    now = time.time()
+    if shop_cache["data"] and now - shop_cache["timestamp"] < shop_cache["ttl"]:
+        return shop_cache["data"]
+    
+    result = api_get("/telegram/shops")
+    if result and result.get("success") and result.get("data"):
+        shops = result["data"]
+        shop_cache["data"] = shops
+        shop_cache["timestamp"] = now
+        logger.info(f"Loaded {len(shops)} shops")
+        return shops
+    
+    logger.warning("No shops from API")
+    return []
 
-def api_put(path, data):
-    try:
-        r = requests.put(f"{API_URL}{path}", json=data, timeout=8)
-        return r.json(), r.status_code
-    except Exception as e:
-        logger.error(f"PUT {path}: {e}")
-        return None, 500
+def get_shop_products(owner_id):
+    """Get products for a specific shop via public API"""
+    now = time.time()
+    key = f"products_{owner_id}"
+    if key in product_cache and now - product_cache[key]["timestamp"] < 30:
+        return product_cache[key]["data"]
+    
+    result = api_get(f"/telegram/products/{owner_id}")
+    if result and result.get("success") and result.get("data"):
+        products = result["data"]
+        product_cache[key] = {"data": products, "timestamp": now}
+        return products
+    
+    product_cache[key] = {"data": [], "timestamp": now}
+    return []
 
+def preload_all_shop_products():
+    """Preload products for ALL shops to show counts in shop list"""
+    shops = get_active_shops()
+    result = []
+    for shop in shops:
+        sid = shop.get("_id")
+        prods = get_shop_products(sid)
+        shop["_product_count"] = len(prods)
+        shop["_has_products"] = len(prods) > 0
+        result.append(shop)
+    return result
 
-def fmt_som(n):
-    try:
-        return f"{int(n):,}".replace(",", " ") + " so'm"
-    except Exception:
-        return str(n) + " so'm"
+def format_price(amount):
+    return f"{amount:,}".replace(",", " ") + " so'm"
 
+user_states = {}
 
-STATUS_UZ = {
-    "booked": "⏳ Navbatda",
-    "arrived": "✂️ Keldi (Stolda)",
-    "done": "✅ Bajarildi",
-    "no_show": "❌ Kelmadi",
-    "cancelled": "🚫 Bekor qilindi",
-}
+# === COMMAND HANDLERS ===
 
-
-def main_menu():
-    return ReplyKeyboardMarkup(
-        [
-            ["✂️ Navbat olish", "📋 Mening navbatim"],
-            ["💈 Sartaroshlar", "💰 Xizmatlar & Narxlar"],
-            ["👨‍💼 Sartarosh kabineti", "ℹ️ Yordam"],
-        ],
-        resize_keyboard=True,
-    )
-
+# === PERSISTENT KEYBOARD ===
+def get_main_keyboard():
+    """Return the persistent ReplyKeyboardMarkup"""
+    buttons = [
+        ["🏪 Do'konlar", "ℹ️ Yordam"],
+        ["☎️ Aloqa"],
+    ]
+    return ReplyKeyboardMarkup(buttons, resize_keyboard=True, input_field_placeholder="Menyudan tanlang...")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data.clear()
-    first_name = update.effective_user.first_name or "Mijoz"
+    """Show store list to customer"""
+    user = update.effective_user
+    shops = get_active_shops()
+
+    # Set persistent keyboard
     await update.message.reply_text(
-        f"Assalomu alaykum, *{first_name}*! 👋\n\n"
-        "✂️ *Barbero — Mahalladagi Sartaroshxona Onlayn Navbat Boti*\n\n"
-        "Ortiqcha navbatda turib vaqt yo'qotmang! Sartaroshni tanlang, qulay vaqtni band qiling va navbatingizni real vaqtda kuzatib boring.\n\n"
-        "👇 Quyidagi tugmalardan birini tanlang:",
-        parse_mode="Markdown",
-        reply_markup=main_menu(),
+        "Xush kelibsiz! 🛍️",
+        reply_markup=get_main_keyboard()
     )
 
-
-async def show_barbers(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    res = api_get("/barbershops/barbers")
-    if not res or not res.get("data"):
+    if not shops:
         await update.message.reply_text(
-            "⚠️ Hozircha faol sartaroshlar topilmadi yoki server bilan aloqa yo'q.\nIltimos, birozdan so'ng qayta urinib ko'ring."
+            f"Assalomu alaykum, {user.first_name}! 🛍️\n\n"
+            f"OsonBiznes do'konlar botiga xush kelibsiz!\n\n"
+            f"Hozircha faol do'konlar mavjud emas.\n"
+            f"Keyinroq qayta urinib ko'ring yoki /refresh ni bosing."
         )
         return
-    barbers = res["data"]
-    buttons = []
-    for b in barbers[:10]:
-        stars = "⭐" + str(b.get("rating", 5.0))
-        btn_text = f"{b.get('avatar','💈')} {b['name']} ({stars}) — {b.get('branchName','Asosiy')}"
-        buttons.append([InlineKeyboardButton(btn_text, callback_data=f"barber:{b['_id']}")])
 
-    buttons.append([InlineKeyboardButton("❌ Bekor qilish", callback_data="cancel")])
+    # Preload products to show counts
+    shops_with_products = preload_all_shop_products()
+    total_products = sum(s.get("_product_count", 0) for s in shops_with_products)
 
-    text = "💈 *Sartaroshni tanlang:*\n\nUstalarning tajribasi va reytingiga qarab o'zingizga ma'qulini tanlang:"
-    if update.callback_query:
-        await update.callback_query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(buttons))
-    else:
-        await update.message.reply_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(buttons))
+    text = (
+        f"Assalomu alaykum, {user.first_name}! 🛍️\n\n"
+        f"📊 {len(shops)} ta do'kon, {total_products} ta mahsulot\n"
+        f"Kerakli do'konni tanlang:\n\n"
+    )
 
+    keyboard = []
+    for shop in shops_with_products[:10]:
+        biz = shop.get("business", shop.get("name", "Do'kon"))
+        pcount = shop.get("_product_count", 0)
+        if pcount > 0:
+            btn_text = f"🏪 {biz}  ({pcount} ta mahsulot)"
+        else:
+            btn_text = f"🏪 {biz}"
+        keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"shop_{shop['_id']}")])
 
-async def show_salons_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    res = api_get("/barbershops")
-    if not res or not res.get("data"):
-        await update.message.reply_text("Salonlar ma'lumoti yuklanmadi.")
-        return
-    lines = ["💈 *Bizning Sartaroshxonalar va Filiallar:*\n"]
-    for s in res["data"]:
-        lines.append(f"*{s['name']}* ⭐ {s.get('rating', 5.0)}")
-        lines.append(f"_{s.get('description', '')}_")
-        for br in s.get("branches", []):
-            lines.append(f"  📍 *{br.get('name','')}*: {br.get('address','')}")
-            if br.get("phone"):
-                lines.append(f"  ☎️ Tel: {br['phone']}")
-        lines.append("")
-    lines.append("Band qilish uchun pastdagi *✂️ Navbat olish* tugmasini bosing.")
-    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+    keyboard.append([InlineKeyboardButton("🔄 Yangilash", callback_data="refresh_shops")])
 
+    await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
-async def show_services_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    res = api_get("/barbershops")
-    if not res or not res.get("data"):
-        await update.message.reply_text("Xizmatlar topilmadi.")
-        return
-    lines = ["💰 *Sartaroshxona Xizmatlari va Narxlari:*\n"]
-    all_services = []
-    for s in res["data"]:
-        for svc in s.get("services", []):
-            if not any(x["name"] == svc["name"] for x in all_services):
-                all_services.append(svc)
+async def refresh(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Refresh shops list"""
+    shop_cache["data"] = None
+    await start(update, context)
 
-    for i, svc in enumerate(all_services, 1):
-        lines.append(f"{i}. *{svc['name']}* — `{fmt_som(svc['price'])}`")
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show help information"""
+    text = (
+        "ℹ️ **OsonBiznes Bot - Yordam**\n\n"
+        "Bu bot orqali siz barcha do'konlarni ko'rib, mahsulotlarni qidirib, buyurtma berishingiz mumkin.\n\n"
+        "🟢 **Mavjud buyruqlar:**\n"
+        "▶ /start - Do'konlar ro'yxatini ko'rish\n"
+        "▶ /shops - Do'konlar ro'yxati\n"
+        "▶ /help - Yordam\n"
+        "▶ /aloqa - Admin bilan bog'lanish\n"
+        "▶ /refresh - Do'konlarni yangilash\n\n"
+        "🟢 **Buyurtma berish:**\n"
+        "1. Do'konni tanlang\n"
+        "2. Mahsulotni tanlang\n"
+        "3. Ismingiz, telefon va manzilni kiriting\n"
+        "4. Yetkazib berish usulini tanlang\n"
+        "5. Tasdiqlang!\n\n"
+        "🟢 **Pastdagi tugmalar:**\n"
+        "🏪 Do'konlar - Barcha do'konlar ro'yxati\n"
+        "ℹ️ Yordam - Ushbu yordam xabari\n"
+        "☎️ Aloqa - Admin bilan bog'lanish"
+    )
+    await update.message.reply_text(text, parse_mode='Markdown', reply_markup=get_main_keyboard())
 
-    lines.append("\n💡 *Eslatma:* 15% kafolat zalogi bilan navbat band qilinadi.")
-    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+async def aloqa_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show contact information"""
+    text = (
+        "☎️ **Admin bilan bog'lanish:**\n\n"
+        "Agar biron muammo yuzaga kelsa, quyidagi kanallar orqali biz bilan bog'lanishingiz mumkin:\n\n"
+        "📢 Telegram kanal: @OsonBiznesUz\n"
+        "💬 Telegram guruh: @OsonBiznesSupport\n"
+        "🤝 Bot: @OSSON_BIZNES_BOT\n\n"
+        "Ish vaqti: Soat 09:00 - 22:00\n"
+        "☎️ Yoki quyidagi tugmani bosing va xabar qoldiring!"
+    )
+async def mahsulotlar_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show products or store catalog"""
+    await start(update, context)
 
+async def buyurtmalarim_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show order tracking information"""
+    text = (
+        "📦 **Mening Buyurtmalarim:**\n\n"
+        "Buyurtmalaringiz holatini bilish uchun buyurtma paytida kiritgan telefon raqamingiz orqali do'kon bilan bog'lanishingiz yoki veb-saytdan tekshirishingiz mumkin.\n\n"
+        "🌐 Veb-sayt: [OsonBiznes.uz](https://osonbiznes.uz)\n"
+        "☎️ Qo'llab-quvvatlash: @OsonBiznesSupport"
+    )
+    await update.message.reply_text(text, parse_mode='Markdown', reply_markup=get_main_keyboard())
 
+async def kabinet_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show user cabinet & platform links"""
+    chat_id = update.effective_chat.id
+    user = update.effective_user
+    name = user.first_name if user else "Foydalanuvchi"
+    text = (
+        f"👤 **Shaxsiy Kabinet - {name}**\n\n"
+        f"🆔 Telegram ID: `{chat_id}`\n"
+        f"🏪 OsonBiznes Marketplace: [OsonBozor](https://osonbiznes.uz/marketplace)\n\n"
+        f"Do'koningizni platformada ochish va mahsulotlaringizni bot orqali sotish uchun [OsonBiznes.uz](https://osonbiznes.uz) da ro'yxatdan o'ting!"
+    )
+    await update.message.reply_text(text, parse_mode='Markdown', reply_markup=get_main_keyboard())
+
+# === CALLBACK HANDLER ===
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
 
-    if data == "cancel":
-        context.user_data.clear()
-        await query.edit_message_text("Amal bekor qilindi.")
+    if data == "back_shops":
+        await show_shop_list(query)
         return
 
-    # 1. Sartarosh tanlandi → Xizmatlar ro'yxati
-    if data.startswith("barber:"):
-        bid = data.split(":", 1)[1]
-        res = api_get("/barbershops/barbers")
-        barbers = (res or {}).get("data", [])
-        barber = next((b for b in barbers if str(b["_id"]) == str(bid)), None)
-        if not barber:
-            await query.edit_message_text("Sartarosh topilmadi.")
+    if data == "refresh_shops":
+        shop_cache["data"] = None
+        product_cache.clear()
+        shops_with_products = preload_all_shop_products()
+        if not shops_with_products:
+            await query.edit_message_text("Do'konlar topilmadi. Server ishlayotganini tekshiring.")
+            return
+        total_products = sum(s.get("_product_count", 0) for s in shops_with_products)
+        text = f"Do'konlar yangilandi! ({len(shops_with_products)} ta, {total_products} ta mahsulot):\n\n"
+        keyboard = []
+        for shop in shops_with_products[:10]:
+            biz = shop.get("business", shop.get("name", "Do'kon"))
+            pcount = shop.get("_product_count", 0)
+            if pcount > 0:
+                btn_text = f"🏪 {biz}  ({pcount} ta mahsulot)"
+            else:
+                btn_text = f"🏪 {biz}"
+            keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"shop_{shop['_id']}")])
+        keyboard.append([InlineKeyboardButton("🔄 Yangilash", callback_data="refresh_shops")])
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+
+    if data.startswith("shop_"):
+        shop_id = data.replace("shop_", "")
+        shops = get_active_shops()
+        shop = next((s for s in shops if s.get("_id") == shop_id), None)
+
+        if not shop:
+            await query.message.reply_text("Do'kon topilmadi")
             return
 
-        context.user_data["barber"] = barber
-        salon = api_get(f"/barbershops/{barber['ownerId']}")
-        services = (salon or {}).get("data", {}).get("services", [])
-        if not services:
-            services = [
-                {"name": "Fade (zamonaviy)", "price": 60000},
-                {"name": "Klassik soch olish", "price": 40000},
-                {"name": "Soqol olish", "price": 25000},
-                {"name": "Soch + Soqol", "price": 70000},
-                {"name": "Bolalar sochi", "price": 30000},
+        biz_name = shop.get("business", shop.get("name", "Do'kon"))
+        context.user_data["current_shop"] = shop_id
+
+        # Get products via public API
+        products = get_shop_products(shop_id)
+
+        if products:
+            text = f"🏪 {biz_name}\n{len(products)} ta mahsulot\n\nMahsulotni tanlang:"
+            keyboard = []
+            for p in products[:10]:
+                stock_info = ""
+                if p.get("stock", 0) <= 0:
+                    stock_info = " ❌"
+                elif p.get("stock", 0) < 5:
+                    stock_info = " ⚠️"
+                btn_text = f"{p['name']} - {format_price(p['price'])}{stock_info}"
+                keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"prod_{p['_id']}")])
+            keyboard.append([InlineKeyboardButton("🛍️ Boshqa mahsulot", callback_data=f"order_shop_{shop_id}")])
+            keyboard.append([InlineKeyboardButton("🔙 Do'konlar ro'yxati", callback_data="back_shops")])
+        else:
+            text = (
+                f"🏪 {biz_name}\n\n"
+                f"Hozircha mahsulotlar mavjud emas.\n"
+                f"Agar xohlasangiz, buyurtma berishingiz mumkin:"
+            )
+            keyboard = [
+                [InlineKeyboardButton("🛍️ Buyurtma berish", callback_data=f"order_shop_{shop_id}")],
+                [InlineKeyboardButton("🔙 Do'konlar ro'yxati", callback_data="back_shops")],
             ]
-        context.user_data["services"] = services
+        
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+        return
 
-        buttons = []
-        for i, s in enumerate(services):
-            buttons.append([InlineKeyboardButton(f"{s['name']} — {fmt_som(s['price'])}", callback_data=f"svc:{i}")])
-        buttons.append([InlineKeyboardButton("⬅️ Boshqa sartarosh", callback_data="back_barbers")])
+    # Show product detail
+    if data.startswith("prod_"):
+        product_id = data.replace("prod_", "")
+        products_data = product_cache.get(f"prod_detail_{product_id}")
+        
+        # Try to get product from any shop's cache
+        found_product = None
+        for key, cache in product_cache.items():
+            if key.startswith("products_") and isinstance(cache, dict) and cache.get("data"):
+                for p in cache["data"]:
+                    if str(p.get("_id")) == product_id:
+                        found_product = p
+                        break
+            if found_product:
+                break
+        
+        if not found_product:
+            # Fetch single product via API
+            shops = get_active_shops()
+            for shop in shops:
+                prods = get_shop_products(shop["_id"])
+                for p in prods:
+                    if str(p["_id"]) == product_id:
+                        found_product = p
+                        break
+                if found_product:
+                    break
+        
+        if found_product:
+            shop_name = "Do'kon"
+            for shop in get_active_shops():
+                if str(shop["_id"]) == str(found_product.get("userId")):
+                    shop_name = shop.get("business", "Do'kon")
+                    break
+            
+            text = (
+                f"📦 {found_product['name']}\n"
+                f"🏪 {shop_name}\n\n"
+                f"💰 Narxi: {format_price(found_product['price'])}\n"
+                f"📊 Qoldiq: {found_product.get('stock', 0)} ta\n"
+                f"📁 Kategoriya: {found_product.get('category', 'Boshqa')}\n"
+            )
+            keyboard = [
+                [InlineKeyboardButton("🛒 Buyurtma berish", callback_data=f"order_prod_{product_id}")],
+                [InlineKeyboardButton("🔙 Orqaga", callback_data=f"shop_{found_product.get('userId')}")],
+                [InlineKeyboardButton("🏪 Barcha do'konlar", callback_data="back_shops")],
+            ]
+            await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+        else:
+            await query.message.reply_text("Mahsulot topilmadi")
+        return
 
-        await query.edit_message_text(
-            f"Tanlandi: {barber.get('avatar','💈')} *{barber['name']}* ⭐{barber.get('rating',5.0)}\n"
-            f"📍 Filial: {barber.get('branchName','Asosiy filial')}\n\n"
-            f"✂️ *Xizmat turini tanlang:*",
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(buttons),
+    # Order a specific product
+    if data.startswith("order_prod_"):
+        product_id = data.replace("order_prod_", "")
+        chat_id = query.message.chat_id
+        # Find the product's shop ID from cache
+        shop_id = None
+        for key, cache in product_cache.items():
+            if key.startswith("products_") and isinstance(cache, dict) and cache.get("data"):
+                for p in cache["data"]:
+                    if str(p.get("_id")) == product_id:
+                        shop_id = str(p.get("userId"))
+                        break
+            if shop_id:
+                break
+        user_states[chat_id] = {"step": "name", "product_id": product_id, "shop_id": shop_id}
+        await query.message.reply_text(
+            "Buyurtma berish uchun ismingizni kiriting:"
         )
+        return
 
-    elif data == "back_barbers":
-        await show_barbers(update, context)
+    # Manual order for a shop (no specific product)
+    if data.startswith("order_shop_"):
+        shop_id = data.replace("order_shop_", "")
+        chat_id = query.message.chat_id
+        user_states[chat_id] = {"step": "product_name", "shop_id": shop_id}
+        await query.message.reply_text(
+            "Buyurtma berish uchun mahsulot nomini yozing:"
+        )
+        return
 
-    # 2. Xizmat tanlandi → Kun tanlash (Bugun / Ertaga / Indinga)
-    elif data.startswith("svc:"):
-        idx = int(data.split(":", 1)[1])
-        services = context.user_data.get("services", [])
-        if idx >= len(services):
+    # Skip address (user will pick up from store)
+    if data == "skip_address":
+        chat_id = query.message.chat_id
+        if chat_id in user_states:
+            state = user_states[chat_id]
+            state["address"] = "Do'kondan olaman"
+            state["step"] = "delivery"
+            # Don't edit the callback message, just send a new one
+            # Ask for delivery method
+            keyboard = [
+                [InlineKeyboardButton("🏠 Do'kondan olib ketish", callback_data="delivery_pickup")],
+                [InlineKeyboardButton("🚚 Yetkazib berish", callback_data="delivery_delivery")],
+            ]
+            await query.message.reply_text(
+                "Mahsulotni qanday olishni xohlaysiz?",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        return
+
+    # Delivery method selection
+    if data.startswith("delivery_"):
+        method = data.replace("delivery_", "")
+        chat_id = query.message.chat_id
+        method = data.replace("delivery_", "")
+        chat_id = query.message.chat_id
+        if chat_id not in user_states:
+            await query.message.reply_text("Buyurtma jarayoni tugagan. Qaytadan /start bosing.")
             return
-        context.user_data["service"] = services[idx]
-
-        today_dt = date.today()
-        d0 = today_dt.isoformat()
-        d1 = (today_dt + timedelta(days=1)).isoformat()
-        d2 = (today_dt + timedelta(days=2)).isoformat()
-
-        buttons = [
-            [InlineKeyboardButton(f"🗓 Bugun ({today_dt.strftime('%d-%m')})", callback_data=f"day:{d0}")],
-            [InlineKeyboardButton(f"🗓 Ertaga ({(today_dt + timedelta(days=1)).strftime('%d-%m')})", callback_data=f"day:{d1}")],
-            [InlineKeyboardButton(f"🗓 Indinga ({(today_dt + timedelta(days=2)).strftime('%d-%m')})", callback_data=f"day:{d2}")],
-            [InlineKeyboardButton("⬅️ Xizmatni o'zgartirish", callback_data=f"barber:{context.user_data.get('barber',{}).get('_id')}")],
+        state = user_states[chat_id]
+        state["delivery_method"] = method
+        state["step"] = "confirm"
+        
+        # Show order summary
+        prod_name = state.get("product_name", "Mahsulot")
+        price_text = ""
+        if state.get("product_id"):
+            for key, cache in product_cache.items():
+                if key.startswith("products_") and isinstance(cache, dict) and cache.get("data"):
+                    for p in cache["data"]:
+                        if str(p.get("_id")) == state["product_id"]:
+                            price_text = f"\n💰 {format_price(p['price'])}"
+                            break
+                    break
+        
+        delivery_text = "🏠 Olib ketish" if method == "pickup" else "🚚 Yetkazib berish"
+        address_text = f"\n📍 {state.get('address', 'Ko\'rsatilmagan')}" if method == "delivery" and state.get("address") else ""
+        
+        msg = (
+            f"📋 Buyurtma ma'lumotlari:\n\n"
+            f"📦 {prod_name}{price_text}\n"
+            f"👤 {state.get('name', 'Noma\'lum')}\n"
+            f"📞 {state.get('phone', 'Noma\'lum')}\n"
+            f"{delivery_text}{address_text}\n\n"
+            f"Tasdiqlaysizmi?"
+        )
+        keyboard = [
+            [InlineKeyboardButton("✅ Tasdiqlash", callback_data="confirm_order")],
+            [InlineKeyboardButton("❌ Bekor qilish", callback_data="cancel_order")],
         ]
+        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+        return
 
-        svc = context.user_data["service"]
-        await query.edit_message_text(
-            f"✂️ Xizmat: *{svc['name']}* ({fmt_som(svc['price'])})\n\n"
-            f"🗓 *Qaysi kunga navbat olmoqchisiz?*",
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(buttons),
-        )
+async def show_shop_list(query):
+    """Show the shop list to the user"""
+    shops_with_products = preload_all_shop_products()
+    if not shops_with_products:
+        await query.edit_message_text("Do'konlar mavjud emas")
+        return
+    total_products = sum(s.get("_product_count", 0) for s in shops_with_products)
+    text = f"Barcha do'konlar ({len(shops_with_products)} ta, {total_products} ta mahsulot):\n\n"
+    keyboard = []
+    for shop in shops_with_products[:10]:
+        biz = shop.get("business", shop.get("name", "Do'kon"))
+        pcount = shop.get("_product_count", 0)
+        if pcount > 0:
+            btn_text = f"🏪 {biz}  ({pcount} ta mahsulot)"
+        else:
+            btn_text = f"🏪 {biz}"
+        keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"shop_{shop['_id']}")])
+    keyboard.append([InlineKeyboardButton("🔄 Yangilash", callback_data="refresh_shops")])
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
-    # 3. Kun tanlandi → Bo'sh vaqt slotlari
-    elif data.startswith("day:"):
-        chosen_date = data.split(":", 1)[1]
-        context.user_data["date"] = chosen_date
-        barber = context.user_data.get("barber")
-        if not barber:
-            await query.edit_message_text("Sartarosh tanlanmagan.")
+# === TEXT HANDLER ===
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    text = update.message.text.strip()
+    lowered = text.lower().strip()
+
+    # ====== PERSISTENT KEYBOARD HANDLERS (check BEFORE order flow) ======
+    if any(k in lowered for k in ["do'konlar", "dokonlar", "magazinlar", "navbat", "sartarosh", "xizmat", "kabinet", "salon", "usta", "fade", "soqol"]):
+        user_states.pop(chat_id, None)  # Clear any active order
+        await start(update, context)
+        return
+    if lowered in ["ℹ️ yordam", "yordam", "help", "y", "/help", "/yordam"]:
+        user_states.pop(chat_id, None)
+        await help_command(update, context)
+        return
+    if lowered in ["☎️ aloqa", "aloqa", "contact", "admin", "a", "/aloqa", "/contact"]:
+        user_states.pop(chat_id, None)
+        await aloqa_command(update, context)
+        return
+
+    # Check if user is in order flow
+    if chat_id in user_states:
+        state = user_states[chat_id]
+        step = state.get("step")
+
+        if step == "product_name":
+            state["product_name"] = text
+            state["step"] = "name"
+            await update.message.reply_text(f"Mahsulot: {text}\n\nEndi ismingizni kiriting:")
             return
 
-        res = api_get(f"/barbershops/barbers/{barber['_id']}/slots?date={chosen_date}")
-        slots = (res or {}).get("data", {}).get("slots", [])
-        free_slots = [s for s in slots if s.get("available")]
+        if step == "name":
+            state["name"] = text
+            state["step"] = "phone"
+            await update.message.reply_text("Telefon raqamingizni kiriting:\n(masalan: +998 90 123 45 67)")
+            return
 
-        if not free_slots:
-            buttons = [[InlineKeyboardButton("⬅️ Boshqa kunni tanlash", callback_data=f"svc:0")]]
-            await query.edit_message_text(
-                f"😔 *{chosen_date}* kunida {barber['name']} uchun barcha vaqtlar band.\nIltimos, boshqa kunni tanlang:",
-                parse_mode="Markdown",
-                reply_markup=InlineKeyboardMarkup(buttons),
+        if step == "phone":
+            state["phone"] = text
+            state["step"] = "address"
+            keyboard = [
+                [InlineKeyboardButton("🏠 Do'kondan olaman", callback_data="skip_address")],
+            ]
+            await update.message.reply_text(
+                "Manzilingizni kiriting:\n(masalan: Toshkent sh., Chilonzor t., 12-uy)\n\n"
+                "Agar do'kondan olib ketmoqchi bo'lsangiz, pastdagi tugmani bosing 👇",
+                reply_markup=InlineKeyboardMarkup(keyboard)
             )
             return
 
-        buttons, row = [], []
-        for s in free_slots[:16]:
-            row.append(InlineKeyboardButton(f"⏰ {s['time']}", callback_data=f"slot:{s['time']}"))
-            if len(row) == 3:
-                buttons.append(row)
-                row = []
-        if row:
-            buttons.append(row)
+        if step == "address":
+            state["address"] = text
+            state["step"] = "delivery"
+            # Ask for delivery method
+            keyboard = [
+                [InlineKeyboardButton("🏠 Do'kondan olib ketish", callback_data="delivery_pickup")],
+                [InlineKeyboardButton("🚚 Yetkazib berish", callback_data="delivery_delivery")],
+            ]
+            await update.message.reply_text(
+                "Mahsulotni qanday olishni xohlaysiz?",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            return
 
-        buttons.append([InlineKeyboardButton("⬅️ Kunni o'zgartirish", callback_data="svc:0")])
+        if step == "confirm":
+            state["confirm"] = text
+            # Process the order via public API
+            product_name = state.get("product_name", "Mahsulot")
+            
+            ok, result = api_post("/telegram/order", {
+                "customer": state.get("name", "Telegram mijoz"),
+                "phone": state.get("phone", ""),
+                "items": [{"name": product_name, "qty": 1, "price": 0}],
+                "total": 0,
+                "source": "telegram",
+                "ownerId": state.get("shop_id"),
+            }, timeout=10)
+            
+            msg = f"✅ Buyurtma qabul qilindi!\n\n📦 {product_name}\n👤 {state.get('name', 'Noma\'lum')}\n📞 {state.get('phone', 'Noma\'lum')}\n\nDo'kon egasi tez orada siz bilan bog'lanadi! 🙏"
+            await update.message.reply_text(msg)
+            
+            user_states.pop(chat_id, None)
+            return
 
-        await query.edit_message_text(
-            f"💈 Sartarosh: *{barber['name']}*\n"
-            f"🗓 Sana: *{chosen_date}*\n\n"
-            f"⏰ *Quyidagi bo'sh vaqtlardan birini tanlang:*",
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(buttons),
-        )
+    # If none matched, show shops with the persistent keyboard still visible
+    await start(update, context)
 
-    # 4. Vaqt tanlandi → Telefon va ism so'rash
-    elif data.startswith("slot:"):
-        slot_time = data.split(":", 1)[1]
-        context.user_data["slot"] = slot_time
-        context.user_data["awaiting"] = "phone"
-
-        await query.edit_message_text(
-            f"⏰ Tanlangan vaqt: *{context.user_data['date']} soat {slot_time}*\n\n"
-            f"📱 Iltimos, navbatni rasmiylashtirish uchun *telefon raqamingizni* yuboring:\n"
-            f"_(Masalan: 90 123 45 67)_",
-            parse_mode="Markdown",
-        )
-
-    # Usta status o'zgartirishi
-    elif data.startswith("bk_status:"):
-        _, bkid, new_status = data.split(":")
-        res, code = api_put(f"/bookings/{bkid}/status", {"status": new_status})
-        if code in [200, 201]:
-            st_text = STATUS_UZ.get(new_status, new_status)
-            await query.edit_message_text(f"✅ Navbat holati o'zgartirildi: *{st_text}*", parse_mode="Markdown")
-        else:
-            await query.edit_message_text("❌ Holatni o'zgartirishda xatolik.")
-
-
-async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    contact = update.message.contact
-    if not contact:
-        return
-    phone = contact.phone_number
-    if not phone.startswith("+"):
-        phone = "+" + phone
-
-    awaiting = context.user_data.get("awaiting")
-    if awaiting == "phone":
-        context.user_data["phone"] = phone
-        context.user_data["awaiting"] = "name"
-        user_name = update.effective_user.first_name or "Mijoz"
-        context.user_data["name"] = user_name
-        return await finalize_booking(update, context)
-    elif awaiting == "track_phone":
-        return await track_by_phone(update, context, phone)
-
-
-async def finalize_booking(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    d = context.user_data
-    payload = {
-        "barberId": d["barber"]["_id"],
-        "service": d["service"]["name"],
-        "servicePrice": d["service"]["price"],
-        "date": d["date"],
-        "timeSlot": d["slot"],
-        "customerName": d.get("name") or update.effective_user.first_name or "Mijoz",
-        "customerPhone": d.get("phone", "+998 90 123 45 67"),
-    }
-    res, code = api_post("/bookings", payload)
-    if code in [200, 201] and res and res.get("data"):
-        b = res["data"]
-        dep = b.get("deposit", int(d["service"]["price"] * 0.15))
-        await update.message.reply_text(
-            f"🎉 *NAVBAT MUVAFFAQIYATLI BAND QILINDI!*\n\n"
-            f"💈 *Sartarosh:* {b.get('barberName', d['barber']['name'])}\n"
-            f"✂️ *Xizmat:* {b.get('service', d['service']['name'])}\n"
-            f"🗓 *Sana va Vaqt:* {b.get('date', d['date'])} {b.get('timeSlot', d['slot'])}\n"
-            f"🎫 *Navbat raqamingiz:* `#{b.get('queueNumber', 1)}`\n"
-            f"💰 *Xizmat narxi:* {fmt_som(b.get('servicePrice', d['service']['price']))}\n"
-            f"🛡️ *Kafolat zalogi (15%):* {fmt_som(dep)}\n\n"
-            f"📍 *Manzil:* {d['barber'].get('branchAddress', 'Bunyodkor shoh ko\'chasi 12')}\n\n"
-            f"Navbatingiz holatini istalgan payt *📋 Mening navbatim* orqali tekshirishingiz mumkin.",
-            parse_mode="Markdown",
-            reply_markup=main_menu(),
-        )
-    else:
-        err_msg = (res or {}).get("message", "Ushbu vaqt band bo'lishi mumkin. Qayta urinib ko'ring.")
-        await update.message.reply_text(f"❌ Xatolik: {err_msg}", reply_markup=main_menu())
-    context.user_data.clear()
-
-
-async def track_by_phone(update: Update, context: ContextTypes.DEFAULT_TYPE, phone: str):
-    context.user_data.pop("awaiting", None)
-    res = api_get(f"/bookings/track?phone={phone}")
-    items = (res or {}).get("data", [])
-    if not items:
-        await update.message.reply_text(
-            f"🔍 *+{phone.replace('+','') if phone else ''}* raqamida hozircha faol navbat topilmadi.\n\n"
-            "Yangi navbat olish uchun *✂️ Navbat olish* tugmasini bosing.",
-            parse_mode="Markdown",
-            reply_markup=main_menu(),
-        )
-        return
-
-    lines = ["📋 *Sizning Faol Navbatlaringiz:*\n"]
-    for b in items:
-        st = STATUS_UZ.get(b["status"], b["status"])
-        lines.append(f"💈 *{b['barberName']}* — {b['service']}")
-        lines.append(f"🗓 Vaqt: *{b['date']} soat {b['timeSlot']}*")
-        lines.append(f"🎫 Navbat: `#{b['queueNumber']}` | Holat: {st}")
-        if b["status"] == "booked":
-            lines.append(f"👥 Oldingizda: *{b['peopleAhead']} kishi*")
-            lines.append(f"⏳ Taxminiy kutish: *~{b['estimatedWaitMin']} daqiqa*\n")
-        elif b["status"] == "arrived":
-            lines.append("✂️ _Siz zalda kutmoqdasiz, tez orada chaqirilasiz!_\n")
-
-    await update.message.reply_text("\n".join(lines), parse_mode="Markdown", reply_markup=main_menu())
-
-
-async def master_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Ustalar uchun bugungi ro'yxat
-    res = api_get("/barbershops/barbers")
-    barbers = (res or {}).get("data", [])
-    if not barbers:
-        await update.message.reply_text("Sartaroshlar topilmadi.")
-        return
-
-    buttons = []
-    for b in barbers:
-        buttons.append([InlineKeyboardButton(f"{b.get('avatar','💈')} {b['name']} (Usta rejimi)", callback_data=f"master_view:{b['_id']}")])
-
-    await update.message.reply_text(
-        "👨‍💼 *Sartarosh / Usta Rejimi:*\nO'z ismingizni tanlang:",
-        parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(buttons),
-    )
-
-
-async def handle_master_view(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# === CALLBACK for order confirmation ===
+async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Separate handler for order confirm/cancel callbacks"""
     query = update.callback_query
     await query.answer()
-    bid = query.data.split(":", 1)[1]
+    data = query.data
 
-    today = date.today().isoformat()
-    # Bookings for this barber
-    res = api_get("/bookings/today")
-    all_bks = (res or {}).get("data", {}).get("bookings", [])
-    barber_bks = [b for b in all_bks if str(b.get("barberId")) == str(bid) or str(b.get("barber", {}).get("_id")) == str(bid)]
+    if data == "confirm_order":
+        chat_id = query.message.chat_id
+        state = user_states.pop(chat_id, {})
 
-    if not barber_bks:
-        await query.edit_message_text("Bugun sizda hali navbatlar yo'q 🎉")
-        return
+        name = state.get("name", "Noma'lum")
+        phone = state.get("phone", "Noma'lum")
+        address = state.get("address", "")
+        delivery_method = state.get("delivery_method", "")
+        product_name = state.get("product_name", "")
+        product_id = state.get("product_id", "")
+        # Get shop ID from state, with fallback to current_shop from context
+        shop_id = state.get("shop_id", None)
+        if not shop_id or shop_id == "None":
+            shop_id = context.user_data.get("current_shop", None)
 
-    lines = [f"💈 *Bugungi Navbatlaringiz ({today}):*\n"]
-    buttons = []
-    for b in barber_bks:
-        st = STATUS_UZ.get(b["status"], b["status"])
-        lines.append(f"⏰ *{b['timeSlot']}* — {b['customerName']} ({b['service']}) — {st}")
-        if b["status"] == "booked":
-            buttons.append([
-                InlineKeyboardButton(f"✅ Keldi ({b['timeSlot']})", callback_data=f"bk_status:{b['_id']}:arrived"),
-                InlineKeyboardButton(f"❌ Kelmadi", callback_data=f"bk_status:{b['_id']}:no_show"),
-            ])
-        elif b["status"] == "arrived":
-            buttons.append([
-                InlineKeyboardButton(f"🎉 Bajarildi ({b['timeSlot']})", callback_data=f"bk_status:{b['_id']}:done"),
-            ])
+        # Try to get product name from ID
+        if product_id and not product_name:
+            for key, cache in product_cache.items():
+                if key.startswith("products_") and isinstance(cache, dict) and cache.get("data"):
+                    for p in cache["data"]:
+                        if str(p.get("_id")) == product_id:
+                            product_name = p["name"]
+                            break
+                if product_name:
+                    break
 
-    buttons.append([InlineKeyboardButton("❌ Yopish", callback_data="cancel")])
-    await query.edit_message_text("\n".join(lines), parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(buttons))
+        if not product_name:
+            product_name = "Mahsulot"
 
+        # Find product price if known
+        price = 0
+        for key, cache in product_cache.items():
+            if key.startswith("products_") and isinstance(cache, dict) and cache.get("data"):
+                for p in cache["data"]:
+                    if p.get("name") == product_name or str(p.get("_id")) == product_id:
+                        price = p.get("price", 0)
+                        break
 
-async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = (update.message.text or "").strip()
+        # Send order via public API (now with productId, address + delivery method)
+        items = [{"name": product_name, "qty": 1, "price": price}]
+        if product_id:
+            items[0]["productId"] = product_id  # For precise stock deduction
+        order_data = {
+            "customer": name,
+            "phone": phone,
+            "items": items,
+            "total": price,
+            "source": "telegram",
+            "ownerId": shop_id,
+            "address": address,
+            "deliveryMethod": delivery_method,
+        }
+        ok, result = api_post("/telegram/order", order_data, timeout=10)
 
-    if text == "✂️ Navbat olish":
-        return await show_barbers(update, context)
-    if text == "📋 Mening navbatim":
-        context.user_data["awaiting"] = "track_phone"
-        await update.message.reply_text(
-            "📱 *Telefon raqamingizni yuboring:*\n_(Masalan: 90 123 45 67)_",
-            parse_mode="Markdown",
+        delivery_text = ""
+        if delivery_method == "pickup":
+            delivery_text = "🏠 Olib ketish"
+        elif delivery_method == "delivery":
+            delivery_text = f"🚚 Yetkazib berish\n📍 {address}" if address else "🚚 Yetkazib berish"
+
+        msg = (
+            f"✅ Buyurtma qabul qilindi! 🎉\n\n"
+            f"📦 {product_name}\n"
+            f"💰 {format_price(price) if price else 'Narx kelishiladi'}\n"
+            f"👤 {name}\n"
+            f"📞 {phone}\n"
+            f"{delivery_text}\n\n"
+            f"Do'kon egasi buyurtmani qabul qildi.\n"
+            f"Holatni dashboard orqali kuzatishingiz mumkin.\n"
+            f"Rahmat! 🙏"
         )
-        return
-    if text == "💈 Sartaroshlar":
-        return await show_salons_info(update, context)
-    if text == "💰 Xizmatlar & Narxlar":
-        return await show_services_info(update, context)
-    if text == "👨‍💼 Sartarosh kabineti":
-        return await master_panel(update, context)
-    if text == "ℹ️ Yordam":
-        await update.message.reply_text(
-            "ℹ️ *Barbero Bot Qo'llanmasi*\n\n"
-            "1. *✂️ Navbat olish* — sartarosh, xizmat va bo'sh vaqtni tanlab navbat band qiling.\n"
-            "2. *📋 Mening navbatim* — navbatingizgacha necha kishi qolganini va qachon kelish kerakligini bilib oling.\n"
-            "3. *Zalog tizimi* — 15% depozit orqali navbat kafolatlanadi.\n\n"
-            "Savol va takliflar uchun: @OsonBiznesSupport",
-            parse_mode="Markdown",
-        )
+        await query.edit_message_text(msg)
         return
 
-    awaiting = context.user_data.get("awaiting")
-
-    # Navbat kuzatish
-    if awaiting == "track_phone":
-        return await track_by_phone(update, context, text)
-
-    # Telefon kiritildi
-    if awaiting == "phone":
-        context.user_data["phone"] = text
-        context.user_data["awaiting"] = "name"
-        await update.message.reply_text("👤 *Ismingizni kiriting:*", parse_mode="Markdown")
+    if data == "cancel_order":
+        chat_id = query.message.chat_id
+        user_states.pop(chat_id, None)
+        await query.edit_message_text("Buyurtma bekor qilindi")
         return
 
-    # Ism kiritildi → Navbatni yaratish
-    if awaiting == "name":
-        context.user_data["name"] = text
-        return await finalize_booking(update, context)
-
-    # Noma'lum buyruq
-    await update.message.reply_text(
-        "Iltimos, quyidagi menyu tugmalaridan birini tanlang 👇",
-        reply_markup=main_menu(),
-    )
-
-
+# === MAIN ===
 def main():
     if not TOKEN:
-        logger.error("TELEGRAM_BOT_TOKEN topilmadi!")
+        logger.error("TELEGRAM_BOT_TOKEN not set!")
+        print("Bot token topilmadi! .env faylini tekshiring.")
         return
 
-    app = Application.builder().token(TOKEN).build()
+    try:
+        application = Application.builder().token(TOKEN).build()
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler(["navbat", "book"], show_barbers))
-    app.add_handler(CommandHandler(["master", "usta"], master_panel))
-    app.add_handler(CallbackQueryHandler(handle_master_view, pattern=r"^master_view:"))
-    app.add_handler(CallbackQueryHandler(handle_callback))
-    app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+        # Command handlers
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("refresh", refresh))
+        application.add_handler(CommandHandler("shops", start))
+        application.add_handler(CommandHandler(["mahsulotlar", "katalog", "products"], mahsulotlar_command))
+        application.add_handler(CommandHandler(["buyurtmalarim", "buyurtma", "orders"], buyurtmalarim_command))
+        application.add_handler(CommandHandler(["kabinet", "profil", "account"], kabinet_command))
+        application.add_handler(CommandHandler(["help", "yordam"], help_command))
+        application.add_handler(CommandHandler(["aloqa", "contact"], aloqa_command))
 
-    logger.info("💈 Barbero Telegram Boti muvaffaqiyatli ishga tushdi!")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+        # Callback handler - first handle order confirmations
+        application.add_handler(CallbackQueryHandler(callback_handler, pattern="^(confirm_order|cancel_order)$"))
+        # Then handle all other callbacks
+        application.add_handler(CallbackQueryHandler(handle_callback))
 
+        # Text handler
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+
+        print(f"""
+🤖 OsonBiznes Multi-Store Bot
+   Bot: https://t.me/OSSON_BIZNES_BOT
+   Mode: API-based (compatible with all backends)
+   Status: Running!
+        """)
+
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
+
+    except Exception as e:
+        logger.error(f"Bot start error: {e}")
+        print(f"Bot ishga tushmadi: {e}")
 
 if __name__ == "__main__":
     main()

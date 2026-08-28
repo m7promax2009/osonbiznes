@@ -99,6 +99,21 @@ router.post('/pay', authenticate, async (req, res) => {
       description: `${TARIFF_LABELS[tariff] || tariff} tarifi uchun tolov (${amount.toLocaleString()} som)`,
     })
 
+    // Adminni yangi to'lov haqida xabardor qilish
+    try {
+      const admin = await User.findOne({ role: 'admin' })
+      if (admin) {
+        await Notification.send({
+          userId: admin._id,
+          type: 'admin_message',
+          title: 'Yangi obuna to\'lovi kutilmoqda 💳',
+          message: `${req.user.name} (${req.user.business || req.user.email}) — ${amount.toLocaleString()} so'm (${TARIFF_LABELS[tariff] || tariff}) uchun ${method.toUpperCase()} orqali to'lov yubordi.`,
+          data: { paymentId: payment._id.toString(), userId: req.user.id, amount, tariff },
+          urgent: true,
+        })
+      }
+    } catch (_) {}
+
     // Simulate payment gateway redirect
     // Real loyihada Click/Payme API ga so'rov yuboriladi
     res.json({
@@ -185,6 +200,104 @@ router.post('/confirm', authenticate, async (req, res) => {
   } catch (error) {
     console.error('Payment confirm error:', error)
     res.status(500).json({ success: false, message: 'Server xatoligi' })
+  }
+})
+
+// POST /api/subscription/pay-card - Karta orqali obuna to'lovini amalga oshirish
+router.post('/pay-card', authenticate, async (req, res) => {
+  try {
+    const { tariff, billingCycle = 'monthly', cardNumber = '', expiry = '', cardHolder = '', phone = '', otp = '' } = req.body
+
+    if (!tariff || !TARIFF_PRICES[tariff]) {
+      return res.status(400).json({ success: false, message: 'Noto\'g\'ri tarif tanlangan' })
+    }
+
+    const cleanCard = cardNumber.replace(/\s+/g, '')
+    if (cleanCard.length < 16) {
+      return res.status(400).json({ success: false, message: 'Karta raqami 16 ta raqamdan iborat bo\'lishi shart' })
+    }
+
+    // Narxni hisoblash
+    const monthlyPrice = TARIFF_PRICES[tariff]
+    const amount = billingCycle === 'yearly'
+      ? (tariff === 'start' ? 948000 : tariff === 'pro' ? 1908000 : 4788000)
+      : monthlyPrice
+
+    const durationDays = billingCycle === 'yearly' ? 365 : SUBSCRIPTION_DAYS
+
+    // To'lov yozuvini yaratish
+    const payment = await Payment.create({
+      userId: req.user.id,
+      amount,
+      method: 'card',
+      type: 'subscription',
+      tariff,
+      status: 'success',
+      phone: phone || req.user.phone || '',
+      description: `${TARIFF_LABELS[tariff] || tariff} tarifi uchun karta orqali to'lov (${cleanCard.slice(0, 4)} •••• •••• ${cleanCard.slice(-4)})`,
+    })
+
+    // Foydalanuvchi obunasini faollashtirish
+    const user = await User.findById(req.user.id)
+    user.tariff = tariff
+    user.subscriptionStart = new Date()
+    user.subscriptionEnd = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000)
+    user.autoPayment = true
+    user.paymentMethod = 'card'
+    await user.save()
+
+    // Adminni xabardor qilish (Pul admin hisobiga tushdi)
+    try {
+      const admin = await User.findOne({ role: 'admin' })
+      if (admin) {
+        await Notification.send({
+          userId: admin._id,
+          type: 'payment_success',
+          title: '💳 Yangi obuna to\'lovi qabul qilindi!',
+          message: `${user.name} (${user.business || user.email}) — ${amount.toLocaleString()} so'm (${TARIFF_LABELS[tariff] || tariff}) uchun karta orqali to'lov qildi. Pul admin hisobiga tushdi.`,
+          data: {
+            paymentId: payment._id.toString(),
+            userId: user._id.toString(),
+            amount,
+            tariff,
+            card: `${cleanCard.slice(0, 4)} **** ${cleanCard.slice(-4)}`,
+          },
+          urgent: true,
+        })
+      }
+    } catch (_) {}
+
+    // Foydalanuvchiga tasdiq xabarnomasi yuborish
+    try {
+      await Notification.send({
+        userId: user._id,
+        type: 'payment_success',
+        title: '🎉 To\'lov muvaffaqiyatli amalga oshirildi!',
+        message: `Sizning kartangizdan (${cleanCard.slice(0, 4)} **** ${cleanCard.slice(-4)}) ${amount.toLocaleString()} so'm yechildi va ${TARIFF_LABELS[tariff] || tariff} tarifi ${durationDays} kunga faollashtirildi!`,
+        data: {
+          paymentId: payment._id.toString(),
+          amount,
+          tariff,
+          subscriptionEnd: user.subscriptionEnd,
+        },
+        urgent: true,
+      })
+    } catch (_) {}
+
+    res.json({
+      success: true,
+      data: {
+        paymentId: payment._id,
+        amount,
+        tariff: user.tariff,
+        subscriptionEnd: user.subscriptionEnd,
+        cardMask: `${cleanCard.slice(0, 4)} **** **** ${cleanCard.slice(-4)}`,
+        message: `To'lov muvaffaqiyatli! ${TARIFF_LABELS[tariff] || tariff} tarifi ${durationDays} kunga faollashtirildi.`,
+      },
+    })
+  } catch (error) {
+    console.error('Pay card error:', error)
+    res.status(500).json({ success: false, message: 'To\'lovni amalga oshirishda xatolik yuz berdi' })
   }
 })
 

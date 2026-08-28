@@ -1,11 +1,9 @@
 import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Eye, EyeOff, ArrowRight, UserPlus, MessageSquare, ScanFace } from 'lucide-react'
+import { Eye, EyeOff, ArrowRight, UserPlus, MessageSquare } from 'lucide-react'
 import api from '../services/api'
 import LanguageSwitcher from '../components/LanguageSwitcher'
 import SupportModal from '../components/SupportModal'
-import Logo from '../components/Logo'
-import FaceIdModal from '../components/FaceIdModal'
 
 export default function Login({ onLogin }) {
   const { t } = useTranslation()
@@ -23,7 +21,6 @@ export default function Login({ onLogin }) {
   const [regForm, setRegForm] = useState({ name: '', email: '', password: '', business: '', phone: '' })
   const [regLoading, setRegLoading] = useState(false)
   const [showSupport, setShowSupport] = useState(false)
-  const [showFaceId, setShowFaceId] = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -62,7 +59,7 @@ export default function Login({ onLogin }) {
 
         <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8">
           <div className="text-center mb-8">
-            <div className="flex justify-center mb-4"><Logo size={44} /></div>
+            <img src="/images/logo-main.png" alt="OsonBiznes" width="1024" height="1024" className="h-10 w-auto mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-slate-900">{t('register.title')}</h1>
             <p className="text-slate-500 text-sm mt-1">{t('register.subtitle')}</p>
           </div>
@@ -111,10 +108,10 @@ export default function Login({ onLogin }) {
         {/* Left side - Login Form */}
         <div className="flex-1 flex items-center justify-center px-6 lg:px-12 bg-white">
           <div className="w-full max-w-md">
-            <div className="mb-8"><Logo size={44} /></div>
+            <img src="/images/logo-main.png" alt="OsonBiznes" width="1024" height="1024" className="h-10 w-auto mb-8" />
 
-            <h1 className="text-2xl font-bold text-slate-900 mb-1">Xush kelibsiz 👋</h1>
-            <p className="text-slate-500 mb-8 text-sm">Salon yoki sartarosh sifatida tizimga kiring</p>
+            <h1 className="text-2xl font-bold text-slate-900 mb-1">{t('login.welcome')}</h1>
+            <p className="text-slate-500 mb-8 text-sm">{t('login.subtitle')}</p>
 
             {error && (
               <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
@@ -147,58 +144,51 @@ export default function Login({ onLogin }) {
               </button>
             </form>
 
-            <button type="button" onClick={() => setShowFaceId(true)} className="mt-4 w-full py-3 rounded-xl border-2 border-indigo-200 text-indigo-700 font-bold text-sm flex items-center justify-center gap-2 hover:bg-indigo-50 transition">
-              <ScanFace className="w-5 h-5" /> Face ID bilan kirish
-            </button>
-
             <div className="mt-6 pt-6 border-t border-slate-100 space-y-3">
-              <p className="text-xs text-slate-500 text-center">Xodim demo — panelni ko'rish uchun rolni tanlang</p>
+              <p className="text-xs text-slate-500 text-center">{t('login.quick_access')}</p>
               <div className="grid grid-cols-2 gap-3">
-                <button type="button" onClick={() => { setEmail('barber@salon.uz'); setPassword('barber123') }} className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 transition-all text-xs font-medium text-slate-600 hover:text-indigo-700">
-                  <span className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-[10px]">E</span>
-                  Salon egasi
+                <button type="button" onClick={() => { setEmail('admin@osonbiznes.uz'); setPassword('Admin123!') }} className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all text-xs font-medium text-slate-600 hover:text-emerald-700">
+                  <span className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-[10px]">A</span>
+                  Admin
                 </button>
-                <button type="button" onClick={() => { setEmail('jasur@salon.uz'); setPassword('jasur123') }} className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-all text-xs font-medium text-slate-600 hover:text-blue-700">
-                  <span className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-[10px]">💈</span>
-                  Sartarosh
+                <button type="button" onClick={() => { setEmail('demo@osonbiznes.uz'); setPassword('demo123') }} className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all text-xs font-medium text-slate-600 hover:text-emerald-700">
+                  <span className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-[10px]">D</span>
+                  {t('nav.products').replace('lar', '')}
                 </button>
               </div>
-              <a href="/salon" className="block text-center text-xs font-semibold text-indigo-600 hover:text-indigo-700 pt-1">
-                ✂️ Mijozmisiz? Sartarosh tanlab, navbatga yoziling →
-              </a>
             </div>
 
             <p className="text-center text-sm text-slate-500 mt-6">
-              Salomingiz bormi? <button onClick={() => setShowRegister(true)} className="text-indigo-600 hover:text-indigo-700 font-medium">Ro'yxatdan o'tish</button>
+              {t('login.no_account')} <button onClick={() => setShowRegister(true)} className="text-emerald-600 hover:text-emerald-700 font-medium">{t('login.register')}</button>
             </p>
           </div>
         </div>
 
         {/* Right side - Gradient with Banner */}
-        <div className="hidden lg:flex flex-1 bg-gradient-to-br from-indigo-600 via-indigo-700 to-indigo-900 items-center justify-center p-12 relative overflow-hidden">
+        <div className="hidden lg:flex flex-1 bg-gradient-to-br from-emerald-600 via-emerald-700 to-emerald-900 items-center justify-center p-12 relative overflow-hidden">
           <div className="absolute inset-0 bg-[url('/images/banner.png')] bg-cover bg-center opacity-20" />
           <div className="absolute -top-20 -right-20 w-64 h-64 bg-white/5 rounded-full" />
           <div className="absolute -bottom-20 -left-20 w-96 h-96 bg-white/5 rounded-full" />
 
           <div className="relative text-center max-w-lg">
-            <div className="text-6xl mb-4">✂️</div>
+            <img src="/images/logo-dark.png" alt="OsonBiznes" width="1024" height="1024" className="h-14 w-auto mx-auto mb-8" />
             <h2 className="text-4xl font-bold text-white mb-4 leading-tight">
-              30 daqiqa kutish yo'q,<br />
-              <span className="text-indigo-200">onlayn navbat</span>
+              {t('app.name')}<br />
+              <span className="text-emerald-200">{t('dashboard.subtitle')}</span>
             </h2>
-            <p className="text-indigo-100/80 text-lg mb-8 leading-relaxed">
-              Sartaroshni skill va reyting bo'yicha tanlang, navbatga yoziling.<br />
-              Zalog tizimi bilan "kelmadi" muammosi hal.
+            <p className="text-emerald-100/80 text-lg mb-8 leading-relaxed">
+              {t('nav.products')}, {t('nav.orders')}, {t('nav.customers')} va {t('nav.telegram')} —<br />
+              {t('subscription.features')}
             </p>
             <div className="grid grid-cols-3 gap-4">
             {[
-              { value: 'Ega', label: 'Bugun nima bor' },
-              { value: 'Sartarosh', label: 'Mening navbatim' },
-              { value: 'Mijoz', label: 'Online band qilish' },
+              { value: '500+', label: 'Foydalanuvchilar' },
+              { value: '99%', label: 'Qoniqish' },
+              { value: '24/7', label: "Qo'llab-quvvatlash" },
             ].map((stat, i) => (
               <div key={i} className="p-4 bg-white/10 rounded-xl backdrop-blur-sm">
-                <p className="text-lg font-bold text-white">{stat.value}</p>
-                <p className="text-xs text-indigo-200/80 mt-1">{stat.label}</p>
+                <p className="text-2xl font-bold text-white">{stat.value}</p>
+                <p className="text-xs text-emerald-200/80 mt-1">{stat.label}</p>
               </div>
             ))}
             </div>
@@ -207,7 +197,6 @@ export default function Login({ onLogin }) {
       </div>
 
       <SupportModal isOpen={showSupport} onClose={() => setShowSupport(false)} />
-      {showFaceId && <FaceIdModal onClose={() => setShowFaceId(false)} onLogin={onLogin} />}
     </>
   )
 }

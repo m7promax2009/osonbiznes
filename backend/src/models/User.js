@@ -25,26 +25,9 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    // shop_owner = ustaxona egasi; master = usta (ishchi)
-    enum: ['admin', 'shop_owner', 'master'],
+    enum: ['admin', 'shop_owner'],
     default: 'shop_owner',
   },
-  // Usta (master) uchun: qaysi ustaxona egasiga tegishli
-  ownerId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    default: null,
-  },
-  // Usta/sartarosh mutaxassisligi
-  specialty: { type: String, default: '' },
-  // Sartarosh profili (marketplace uchun)
-  avatar: { type: String, default: '' }, // emoji yoki rasm
-  skills: { type: [String], default: [] }, // ["Fade", "Soqol", "Bola sochi"]
-  rating: { type: Number, default: 5, min: 0, max: 5 },
-  reviewCount: { type: Number, default: 0 },
-  priceFrom: { type: Number, default: 0 },
-  branchName: { type: String, default: '' }, // qaysi filialda ishlaydi
-  bio: { type: String, default: '' },
   business: {
     type: String,
     trim: true,
@@ -77,7 +60,7 @@ const userSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['click', 'payme', 'none'],
+    enum: ['click', 'payme', 'card', 'cash', 'transfer', 'none'],
     default: 'none',
   },
   // Statistika

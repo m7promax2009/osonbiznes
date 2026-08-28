@@ -78,9 +78,7 @@ app.use('/api/support', require('./src/routes/support'))
 app.use('/api/cards', require('./src/routes/cards'))
 app.use('/api/marketplace', require('./src/routes/marketplace'))
 app.use('/api/upload', require('./src/routes/upload'))
-app.use('/api/workorders', require('./src/routes/workorders'))
-app.use('/api/barbershops', require('./src/routes/barbershops'))
-app.use('/api/bookings', require('./src/routes/bookings'))
+app.use('/api/ai', require('./src/routes/ai'))
 
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')))

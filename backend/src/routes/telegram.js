@@ -113,6 +113,9 @@ router.post('/order', orderLimiter, async (req, res) => {
     const subtotal = orderItems.reduce((sum, i) => sum + i.price * i.qty, 0)
     const orderTotal = subtotal
 
+    const { paymentMethod = 'cash' } = req.body
+    const isCardPaid = paymentMethod === 'card' || req.body.paymentStatus === 'paid'
+
     const order = await Order.createOrder({
       userId,
       customer,
@@ -121,10 +124,11 @@ router.post('/order', orderLimiter, async (req, res) => {
       subtotal,
       total: orderTotal,
       status: 'pending',
-      payment: 'unpaid',
-      source: 'telegram',
+      payment: isCardPaid ? 'paid' : 'unpaid',
+      paymentMethod: paymentMethod || 'cash',
+      source: req.body.source || 'website',
       address: address || '',
-      deliveryMethod: deliveryMethod || '',
+      deliveryMethod: deliveryMethod || 'pickup',
     })
 
     // Qoldiqni kamaytirish — stock >= qty sharti manfiy qoldiqning oldini oladi

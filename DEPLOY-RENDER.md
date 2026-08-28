@@ -1,56 +1,61 @@
-# 🚀 Barbero — Render.com'ga deploy
+# 🚀 OsonBiznes — Render.com'ga deploy qo'llanmasi
 
-3 ta servis: **backend** (API), **frontend** (sayt), **telegram-bot**. Baza — **MongoDB Atlas** (bepul).
+OsonBiznes tizimini Render.com bulutli serveriga joylashtirish bo'yicha to'liq qo'llanma.
 
-## 1. MongoDB Atlas (baza)
-1. https://cloud.mongodb.com → bepul akkaunt → **M0 (Free)** cluster yarating.
-2. **Database Access** → foydalanuvchi yarating (login+parol).
-3. **Network Access** → `0.0.0.0/0` qo'shing (hamma joydan ruxsat).
-4. **Connect → Drivers** → connection string'ni oling:
-   `mongodb+srv://<user>:<parol>@cluster0.xxxxx.mongodb.net/barbero?retryWrites=true&w=majority`
+---
 
-## 2. Kodni GitHub'ga
+## 1. Tayyorgarlik
+
+### MongoDB Atlas bazasi
+1. [MongoDB Atlas](https://cloud.mongodb.com)'da bepul klaster yarating.
+2. Network Access bo'limida `0.0.0.0/0` (barcha IP larga ruxsat) qo'shing.
+3. Database Access bo'limida foydalanuvchi va kuchli parol yarating.
+4. Ulanish satrini (Connection String) oling:
+   `mongodb+srv://<user>:<parol>@cluster0.xxxxx.mongodb.net/osonbiznes?retryWrites=true&w=majority`
+
+---
+
+## 2. GitHub'ga yuklash
+
 ```bash
-cd /Users/shodiyor/Desktop/OsonBiznes
-git init && git add . && git commit -m "Barbero"
-# GitHub'da repo yarating, keyin:
-git remote add origin https://github.com/<siz>/barbero.git
-git push -u origin main
+git add .
+git commit -m "OsonBiznes full-stack platform"
+git push origin main
 ```
-> `.gitignore` `.env` va `node_modules`ni chetlab o'tadi — kalitlar repo'ga tushmaydi. ✅
 
-## 3. Render Blueprint
-1. https://render.com → **New → Blueprint** → repo'ni tanlang. `render.yaml` avtomatik o'qiladi (3 servis).
-2. **Har servis uchun `sync: false` env'larni to'ldiring:**
+---
 
-**barbero-api:**
-- `MONGODB_URI` = Atlas string (yuqoridagi)
-- `TELEGRAM_BOT_TOKEN` = @BotFather'dan olingan token
-- `FRONTEND_URL` = `https://barbero-web.onrender.com` (frontend URL — deploy'dan keyin aniq bo'ladi)
-- `JWT_SECRET` avtomatik yaratiladi ✅
+## 3. Render.com'da Servislarni Yaratish
 
-**barbero-web:**
-- `VITE_API_URL` = `https://barbero-api.onrender.com/api` (backend URL + `/api`)
+### A. Backend (Web Service)
+1. **Name:** `osonbiznes-api`
+2. **Root Directory:** `backend`
+3. **Build Command:** `npm install`
+4. **Start Command:** `npm start`
+5. **Environment Variables:**
+   - `NODE_ENV` = `production`
+   - `PORT` = `5000`
+   - `MONGODB_URI` = *(MongoDB Atlas ulanish satri)*
+   - `JWT_SECRET` = *(Kamida 32 belgili maxfiy kalit)*
+   - `FRONTEND_URL` = `https://osonbiznes-web.onrender.com`
+   - `TELEGRAM_BOT_TOKEN` = *(BotFather'dan olingan token)*
 
-**barbero-bot:**
-- `TELEGRAM_BOT_TOKEN` = xuddi shu token
-- `API_URL` = `https://barbero-api.onrender.com/api`
+### B. Frontend (Static Site)
+1. **Name:** `osonbiznes-web`
+2. **Root Directory:** `frontend`
+3. **Build Command:** `npm install && npm run build`
+4. **Publish Directory:** `dist`
+5. **Environment Variables:**
+   - `VITE_API_URL` = `https://osonbiznes-api.onrender.com/api`
 
-3. **Apply** → Render 3 servisni quradi.
+---
 
-## 4. Deploy'dan keyin
-- Frontend URL'ni oching → sayt ishlaydi.
-- Agar frontend backend'ga ulanmasa: `VITE_API_URL` to'g'ri ekanini tekshirib, frontend'ni **Manual Deploy → Clear build cache** qiling (VITE env build vaqtida o'qiladi).
-- `FRONTEND_URL`ni haqiqiy frontend URL'ga yangilang (CORS uchun), backend'ni redeploy qiling.
+## 4. Boshlang'ich Ma'lumotlar (Seed Data)
 
-## ⚠️ Muhim
-- **Bepul tier**: backend 15 daqiqa harakatsizlikdan keyin "uxlaydi" — birinchi so'rov 30-50 soniya sekin. Demo oldidan bir marta oching (uyg'otish uchun).
-- **MONGODB_URI majburiy** — bo'lmasa backend in-memory'ga tushadi (ma'lumot yo'qoladi). Atlas'ni albatta ulang.
-- Demo ma'lumotlar (salonlar, sartaroshlar) birinchi ishga tushishda avtomatik yaratiladi.
+Backend birinchi marta ishga tushganda avtomatik ravishda demo do'konlar va admin hisobini yaratadi:
 
-## Demo akkauntlar (deploy'dan keyin ham)
-| Rol | Login | Parol |
-|-----|-------|-------|
-| Salon egasi | barber@salon.uz | barber123 |
-| Sartarosh | jasur@salon.uz | jasur123 |
-| Mijoz | login yo'q — bosh sahifa | — |
+| Rol | Email | Parol |
+|---|---|---|
+| Admin | `admin@osonbiznes.uz` | `Admin123!` |
+| Do'kon egasi | `demo@osonbiznes.uz` | `demo123` |
+| Do'kon egasi 2 | `bobur@osonbiznes.uz` | `bobur123` |

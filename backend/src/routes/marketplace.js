@@ -346,7 +346,7 @@ router.get('/shop/:userId', async (req, res) => {
       userId: req.params.userId,
       isActive: { $ne: false },
       stock: { $gt: 0 },
-    }).select('name price category stock sku description image').sort({ createdAt: -1 }).limit(30).lean()
+    }).select('name price category stock sku description image images').sort({ createdAt: -1 }).limit(30).lean()
 
     res.json({
       success: true,

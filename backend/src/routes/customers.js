@@ -33,12 +33,16 @@ router.get('/', authenticate, async (req, res) => {
 // GET /api/customers/stats
 router.get('/stats', authenticate, async (req, res) => {
   try {
-    const [total, vipCount] = await Promise.all([
+    const [total, vipCount, debtCustomers] = await Promise.all([
       Customer.countDocuments({ userId: req.user.id, isActive: true }),
       Customer.countDocuments({ userId: req.user.id, tags: 'VIP', isActive: true }),
+      Customer.find({ userId: req.user.id, isActive: true, debt: { $gt: 0 } }).select('debt').lean(),
     ])
-    res.json({ success: true, data: { total, vip: vipCount } })
+    const totalDebt = debtCustomers.reduce((sum, c) => sum + (c.debt || 0), 0)
+    const debtorsCount = debtCustomers.length
+    res.json({ success: true, data: { total, vip: vipCount, totalDebt, debtorsCount } })
   } catch (error) {
+    console.error('Customer stats error:', error)
     res.status(500).json({ success: false, message: 'Server xatoligi' })
   }
 })
@@ -69,7 +73,7 @@ router.get('/:id', authenticate, async (req, res) => {
 // POST /api/customers (obuna faol + tarif chekloviga bo'ysunadi)
 router.post('/', authenticate, requireActiveSubscription, enforceLimit('customers'), async (req, res) => {
   try {
-    const { name, phone, email, city, address, notes } = req.body
+    const { name, phone, email, city, address, notes, tags, debt, debtDueDate, cashback, tier } = req.body
     if (!name) return res.status(400).json({ success: false, message: 'Ism majburiy' })
 
     const customer = await Customer.create({
@@ -80,7 +84,11 @@ router.post('/', authenticate, requireActiveSubscription, enforceLimit('customer
       city: city || '',
       address: address || '',
       notes: notes || '',
-      tags: ['Yangi'],
+      tags: Array.isArray(tags) && tags.length > 0 ? tags : ['Yangi'],
+      debt: Number(debt) || 0,
+      debtDueDate: debtDueDate ? new Date(debtDueDate) : null,
+      cashback: Number(cashback) || 0,
+      tier: tier || 'Bronze',
     })
 
     // Foydalanuvchi statistikasini yangilash
@@ -95,7 +103,7 @@ router.post('/', authenticate, requireActiveSubscription, enforceLimit('customer
 // PUT /api/customers/:id
 router.put('/:id', authenticate, async (req, res) => {
   try {
-    const { name, phone, email, city, address, notes, tags } = req.body
+    const { name, phone, email, city, address, notes, tags, debt, debtDueDate, cashback, tier } = req.body
     const update = {}
     if (name !== undefined) update.name = name
     if (phone !== undefined) update.phone = phone
@@ -104,6 +112,10 @@ router.put('/:id', authenticate, async (req, res) => {
     if (address !== undefined) update.address = address
     if (notes !== undefined) update.notes = notes
     if (tags !== undefined) update.tags = tags
+    if (debt !== undefined) update.debt = Math.max(0, Number(debt))
+    if (debtDueDate !== undefined) update.debtDueDate = debtDueDate ? new Date(debtDueDate) : null
+    if (cashback !== undefined) update.cashback = Math.max(0, Number(cashback))
+    if (tier !== undefined) update.tier = tier
 
     const customer = await Customer.findOneAndUpdate(
       { _id: req.params.id, userId: req.user.id },
@@ -113,6 +125,35 @@ router.put('/:id', authenticate, async (req, res) => {
 
     if (!customer) return res.status(404).json({ success: false, message: 'Mijoz topilmadi' })
     res.json({ success: true, data: customer })
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server xatoligi' })
+  }
+})
+
+// POST /api/customers/:id/pay-debt - Nasiya qarzini to'lash (kamaytirish)
+router.post('/:id/pay-debt', authenticate, async (req, res) => {
+  try {
+    const amount = Number(req.body.amount)
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ success: false, message: 'To\'lov summasi musbat bo\'lishi kerak' })
+    }
+
+    const customer = await Customer.findOne({ _id: req.params.id, userId: req.user.id })
+    if (!customer) return res.status(404).json({ success: false, message: 'Mijoz topilmadi' })
+
+    const currentDebt = customer.debt || 0
+    const newDebt = Math.max(0, currentDebt - amount)
+    customer.debt = newDebt
+    if (newDebt === 0) {
+      customer.debtDueDate = null
+    }
+    await customer.save()
+
+    res.json({
+      success: true,
+      data: customer,
+      message: `Nasiya qarzidan ${amount.toLocaleString()} so'm to'landi. Qolgan qarz: ${newDebt.toLocaleString()} so'm`,
+    })
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server xatoligi' })
   }

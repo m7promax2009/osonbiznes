@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { useTranslation } from 'react-i18next'
 import { CreditCard, AlertTriangle, CheckCircle, TrendingUp, Users, Store } from 'lucide-react'
 import api from '../../services/api'
 
 export default function AdminSubscriptions() {
-  const { t } = useTranslation()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -41,11 +39,11 @@ export default function AdminSubscriptions() {
   if (!data) return null
 
   const tariffLabels = {
-    trial: t('adminSubs.tariffTrial'),
-    start: t('adminSubs.tariffStart'),
-    pro: t('adminSubs.tariffPro'),
-    business: t('adminSubs.tariffBusiness'),
-    blocked: t('adminSubs.tariffBlocked'),
+    trial: 'Trial',
+    start: 'Start',
+    pro: 'Pro',
+    business: 'Biznes',
+    blocked: 'Bloklangan',
   }
 
   const tariffColors = {
@@ -61,8 +59,8 @@ export default function AdminSubscriptions() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">{t('adminSubs.title')}</h1>
-        <p className="text-sm text-slate-500 mt-1">{t('adminSubs.subtitle')}</p>
+        <h1 className="text-2xl font-bold text-slate-900">Obunalar</h1>
+        <p className="text-sm text-slate-500 mt-1">Tariflar bo'yicha statistika</p>
       </div>
 
       {/* Overview cards */}
@@ -74,7 +72,7 @@ export default function AdminSubscriptions() {
             </div>
           </div>
           <p className="text-2xl font-bold text-slate-900">{total}</p>
-          <p className="text-sm text-slate-500">{t('adminSubs.totalUsers')}</p>
+          <p className="text-sm text-slate-500">Jami foydalanuvchilar</p>
         </div>
 
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
@@ -84,7 +82,7 @@ export default function AdminSubscriptions() {
             </div>
           </div>
           <p className="text-2xl font-bold text-slate-900">{data.expiringTrials || 0}</p>
-          <p className="text-sm text-slate-500">{t('adminSubs.expiringTrials')}</p>
+          <p className="text-sm text-slate-500">3 kunda trial tugaydi</p>
         </div>
 
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
@@ -94,7 +92,7 @@ export default function AdminSubscriptions() {
             </div>
           </div>
           <p className="text-2xl font-bold text-slate-900">{data.expiredSubscriptions || 0}</p>
-          <p className="text-sm text-slate-500">{t('adminSubs.expiredSubscriptions')}</p>
+          <p className="text-sm text-slate-500">Muddati o'tgan obunalar</p>
         </div>
 
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
@@ -104,13 +102,13 @@ export default function AdminSubscriptions() {
             </div>
           </div>
           <p className="text-2xl font-bold text-slate-900">{data.breakdown?.filter(b => b._id !== 'trial').reduce((s, b) => s + b.count, 0) || 0}</p>
-          <p className="text-sm text-slate-500">{t('adminSubs.payingUsers')}</p>
+          <p className="text-sm text-slate-500">To'lovchi foydalanuvchilar</p>
         </div>
       </div>
 
       {/* Tariff breakdown */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-        <h3 className="font-bold text-slate-800 mb-6">{t('adminSubs.breakdownTitle')}</h3>
+        <h3 className="font-bold text-slate-800 mb-6">Tariflar bo'yicha taqsimot</h3>
 
         <div className="space-y-5">
           {data.breakdown?.map((item) => {
@@ -141,7 +139,7 @@ export default function AdminSubscriptions() {
         {(!data.breakdown || data.breakdown.length === 0) && (
           <div className="text-center py-8 text-slate-500">
             <Store className="w-10 h-10 mx-auto mb-2 opacity-50" aria-hidden="true" />
-            <p className="text-sm">{t('adminSubs.noData')}</p>
+            <p className="text-sm">Ma'lumot yo'q</p>
           </div>
         )}
       </div>

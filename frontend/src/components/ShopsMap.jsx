@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
-// Do'kon/ustaxonalarni interaktiv kartada ko'rsatadi (OpenStreetMap).
+// Do'konlarni interaktiv kartada ko'rsatadi (OpenStreetMap).
 // Har marker popup'ida: nomi, manzil, "Qo'ng'iroq" (tel:) va "Yo'l ko'rsatish" (Google Maps).
 export default function ShopsMap({ shops = [], height = 400, activeId = null }) {
   const elRef = useRef(null)
@@ -31,7 +31,7 @@ export default function ShopsMap({ shops = [], height = 400, activeId = null }) 
       const tel = (s.phone || '').replace(/[^\d+]/g, '')
       m.bindPopup(`
         <div style="min-width:170px;font-family:sans-serif">
-          <div style="font-weight:700;font-size:13px;color:#0f172a">${s.name || 'Salon'}</div>
+          <div style="font-weight:700;font-size:13px;color:#0f172a">${s.name || 'Do\'kon'}</div>
           <div style="font-size:11px;color:#64748b;margin-top:2px">${s.address || s.city || ''}</div>
           <div style="display:flex;gap:6px;margin-top:8px">
             ${tel ? `<a href="tel:${tel}" style="flex:1;text-align:center;background:#059669;color:#fff;padding:6px 8px;border-radius:8px;font-size:11px;font-weight:700;text-decoration:none">📞 Qo'ng'iroq</a>` : ''}

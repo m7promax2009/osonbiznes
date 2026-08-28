@@ -68,7 +68,7 @@ const shopProfileSchema = new mongoose.Schema({
     type: String,
     trim: true,
   }],
-  // Filiallar (bir salon bir nechta filialga ega bo'lishi mumkin)
+  // Filiallar (bir do'kon bir nechta filialga ega bo'lishi mumkin)
   branches: [{
     name: { type: String, default: '' },
     address: { type: String, default: '' },

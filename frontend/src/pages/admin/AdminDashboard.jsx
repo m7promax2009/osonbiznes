@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Users, Store, DollarSign, CreditCard, TrendingUp, Calendar, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
 import api from '../../services/api'
 
 export default function AdminDashboard() {
-  const { t } = useTranslation()
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -46,30 +44,30 @@ export default function AdminDashboard() {
 
   const statCards = [
     {
-      title: t('adminDash.shopOwners'),
+      title: "Do'kon egalari",
       value: stats.totalShops,
-      sub: t('adminDash.activeCount', { count: stats.activeShops }),
+      sub: `${stats.activeShops} faol`,
       icon: Store,
       color: 'emerald',
     },
     {
-      title: t('adminDash.activeSubscriptions'),
+      title: 'Faol obunalar',
       value: stats.paidShops,
-      sub: t('adminDash.trialCount', { count: stats.trialShops }),
+      sub: `${stats.trialShops} trial`,
       icon: CreditCard,
       color: 'blue',
     },
     {
-      title: t('adminDash.totalOrders'),
+      title: 'Jami buyurtmalar',
       value: stats.totalOrders,
       sub: formatPrice(stats.totalRevenue),
       icon: TrendingUp,
       color: 'purple',
     },
     {
-      title: t('adminDash.monthlyRevenue'),
+      title: 'Oylik daromad',
       value: formatPrice(stats.monthlyRevenue),
-      sub: t('adminDash.totalPayments'),
+      sub: 'jami to\'lovlar',
       icon: DollarSign,
       color: 'amber',
     },
@@ -79,14 +77,14 @@ export default function AdminDashboard() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">{t('adminDash.title')}</h1>
-          <p className="text-sm text-slate-500 mt-1">{t('adminDash.subtitle')}</p>
+          <h1 className="text-2xl font-bold text-slate-900">Admin Dashboard</h1>
+          <p className="text-sm text-slate-500 mt-1">Platforma statistikasi va boshqaruvi</p>
         </div>
         <button
           onClick={loadStats}
           className="btn-secondary text-sm"
         >
-          {t('adminDash.refresh')}
+          Yangilash
         </button>
       </div>
 
@@ -121,7 +119,7 @@ export default function AdminDashboard() {
         {/* Recent shop owners */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200">
           <div className="p-6 pb-4 border-b border-slate-100">
-            <h3 className="font-bold text-slate-800">{t('adminDash.recentRegistrations')}</h3>
+            <h3 className="font-bold text-slate-800">Oxirgi ro'yxatdan o'tganlar</h3>
           </div>
           <div className="divide-y divide-slate-100">
             {stats.recentShops?.length > 0 ? stats.recentShops.map((shop) => (
@@ -143,7 +141,7 @@ export default function AdminDashboard() {
                 </span>
               </div>
             )) : (
-              <div className="p-6 text-center text-slate-500 text-sm">{t('adminDash.noDataYet')}</div>
+              <div className="p-6 text-center text-slate-500 text-sm">Hozircha ma'lumot yo'q</div>
             )}
           </div>
         </div>
@@ -151,7 +149,7 @@ export default function AdminDashboard() {
         {/* Recent payments */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200">
           <div className="p-6 pb-4 border-b border-slate-100">
-            <h3 className="font-bold text-slate-800">{t('adminDash.recentPayments')}</h3>
+            <h3 className="font-bold text-slate-800">Oxirgi to'lovlar</h3>
           </div>
           <div className="divide-y divide-slate-100">
             {stats.recentPayments?.length > 0 ? stats.recentPayments.map((payment) => (
@@ -165,13 +163,13 @@ export default function AdminDashboard() {
                   }
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-slate-800">{payment.userId?.name || t('adminDash.unknown')}</p>
-                  <p className="text-xs text-slate-500">{t('adminDash.tariffLabel', { tariff: payment.tariff })} • {payment.method}</p>
+                  <p className="text-sm font-medium text-slate-800">{payment.userId?.name || 'Noma\'lum'}</p>
+                  <p className="text-xs text-slate-500">{payment.tariff} tarifi • {payment.method}</p>
                 </div>
                 <p className="text-sm font-bold text-slate-800">{formatPrice(payment.amount)}</p>
               </div>
             )) : (
-              <div className="p-6 text-center text-slate-500 text-sm">{t('adminDash.noPaymentsYet')}</div>
+              <div className="p-6 text-center text-slate-500 text-sm">Hozircha to'lovlar yo'q</div>
             )}
           </div>
         </div>

@@ -1,11 +1,11 @@
-# Barbero — Render.com Blueprint (backend + frontend + telegram bot)
+# OsonBiznes — Render.com Blueprint (backend + frontend + telegram bot)
 # Ma'lumotlar bazasi: MongoDB Atlas (bepul tier) — MONGODB_URI ni dashboard'da kiriting.
 # Deploy: Render → New → Blueprint → shu repo'ni tanlang.
 
 services:
   # 1) Backend API (Node/Express)
   - type: web
-    name: barbero-api
+    name: osonbiznes-api
     runtime: node
     rootDir: backend
     plan: free
@@ -24,13 +24,13 @@ services:
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: FRONTEND_URL
-        sync: false            # frontend URL, masalan: https://barbero-web.onrender.com
+        sync: false            # frontend URL, masalan: https://osonbiznes-web.onrender.com
       - key: MONGOMS_DISABLE_POSTINSTALL
         value: "1"
 
   # 2) Frontend (React static site)
   - type: web
-    name: barbero-web
+    name: osonbiznes-web
     runtime: static
     rootDir: frontend
     plan: free
@@ -38,7 +38,7 @@ services:
     staticPublishPath: dist
     envVars:
       - key: VITE_API_URL
-        sync: false            # https://barbero-api.onrender.com/api
+        sync: false            # https://osonbiznes-api.onrender.com/api
     routes:
       - type: rewrite
         source: /*
@@ -46,7 +46,7 @@ services:
 
   # 3) Telegram bot (Python worker)
   - type: worker
-    name: barbero-bot
+    name: osonbiznes-bot
     runtime: python
     rootDir: telegram-bot
     plan: free
@@ -56,4 +56,4 @@ services:
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: API_URL
-        sync: false            # https://barbero-api.onrender.com/api
+        sync: false            # https://osonbiznes-api.onrender.com/api

@@ -33,8 +33,6 @@ async function authenticate(req, res, next) {
       tariff: user.tariff,
       tariffStatus: user.tariffStatus,
       trialDaysLeft: user.trialDaysLeft,
-      ownerId: user.ownerId, // usta uchun: ustaxona egasi id
-      specialty: user.specialty,
     }
 
     next()

@@ -272,6 +272,18 @@ router.put('/payments/:id/approve', async (req, res) => {
         user.subscriptionEnd = new Date(Date.now() + SUBSCRIPTION_DAYS * 24 * 60 * 60 * 1000)
         user.paymentMethod = payment.method
         await user.save()
+
+        try {
+          const Notification = require('../models/Notification')
+          await Notification.send({
+            userId: user._id,
+            type: 'payment_success',
+            title: "Obuna to'lovingiz tasdiqlandi! 🎉",
+            message: `Sizning ${payment.amount.toLocaleString()} so'mlik (${payment.tariff.toUpperCase()}) to'lovingiz admin tomonidan tasdiqlandi va tarifingiz 30 kunga faollashtirildi.`,
+            data: { paymentId: payment._id.toString(), tariff: payment.tariff },
+            urgent: true,
+          })
+        } catch (_) {}
       }
     }
 
@@ -291,6 +303,19 @@ router.put('/payments/:id/reject', async (req, res) => {
       { new: true }
     )
     if (!payment) return res.status(404).json({ success: false, message: 'Tolov topilmadi' })
+
+    try {
+      const Notification = require('../models/Notification')
+      await Notification.send({
+        userId: payment.userId,
+        type: 'payment_failed',
+        title: "To'lovingiz rad etildi",
+        message: `Sizning ${payment.amount.toLocaleString()} so'mlik to'lovingiz admin tomonidan rad etildi. Iltimos, to'lov ma'lumotlarini qayta tekshirib yuboring.`,
+        data: { paymentId: payment._id.toString() },
+        urgent: true,
+      })
+    } catch (_) {}
+
     res.json({ success: true, data: payment })
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server xatoligi' })

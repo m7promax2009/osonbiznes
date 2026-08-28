@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import api from '../services/api'
 import LanguageSwitcher from './LanguageSwitcher'
+import NotificationsDropdown from './NotificationsDropdown'
 
 const navItems = [
   { to: '/admin', icon: LayoutDashboard, key: 'dashboard', end: true },
@@ -131,14 +132,14 @@ export default function AdminLayout({ user, onLogout }) {
           <div className="my-4 border-t border-slate-800" />
 
           <a
-            href="/salon"
+            href="/marketplace"
             target="_blank"
             rel="noopener noreferrer"
-            title="Salon vitrinasini mijoz ko'zi bilan ko'rish (yangi oynada)"
+            title="OsonBozor vitrinasini mijoz ko'zi bilan ko'rish (yangi oynada)"
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-500 hover:bg-slate-800 hover:text-slate-300 transition-all"
           >
             <Store className="w-5 h-5" />
-            <span>Salon vitrinasi</span>
+            <span>OsonBozor vitrinasi</span>
             <svg className="w-3 h-3 ml-auto opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
           </a>
         </nav>
@@ -158,7 +159,7 @@ export default function AdminLayout({ user, onLogout }) {
       </aside>
 
       <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-8 sticky top-0 z-10">
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-8 sticky top-0 z-40">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setSidebarOpen(true)}
@@ -177,72 +178,11 @@ export default function AdminLayout({ user, onLogout }) {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Notification bell */}
+            <NotificationsDropdown isAdmin={true} />
+
             {/* Language Switcher */}
             <LanguageSwitcher dropdown />
-
-            {/* Notification bell */}
-            <div className="relative">
-              <button
-                onClick={() => setNotifOpen(!notifOpen)}
-                aria-label={t('notifications.title')}
-                aria-expanded={notifOpen}
-                className="relative p-2 hover:bg-slate-100 rounded-lg transition"
-              >
-                <Bell className={`w-5 h-5 ${unreadCount > 0 ? 'text-emerald-600' : 'text-slate-500'}`} aria-hidden="true" />
-                {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-[10px] text-white font-bold animate-pulse-dot">
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </span>
-                )}
-              </button>
-
-              {notifOpen && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setNotifOpen(false)} />
-                  <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl shadow-lg border border-slate-200 z-20 animate-fade-in">
-                    <div className="flex items-center justify-between p-3 border-b border-slate-100">
-                      <h3 className="text-sm font-bold text-slate-800">{t('notifications.title')}</h3>
-                      {unreadCount > 0 && (
-                        <button onClick={handleMarkAllRead} className="text-xs text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
-                          <CheckCheck className="w-3 h-3" /> {t('notifications.mark_all_read')}
-                        </button>
-                      )}
-                    </div>
-                    <div className="max-h-80 overflow-y-auto">
-                      {notifications.length === 0 ? (
-                        <div className="p-8 text-center text-sm text-slate-500">
-                          <Bell className="w-8 h-8 mx-auto mb-2 opacity-50" aria-hidden="true" />
-                          {t('notifications.empty')}
-                        </div>
-                      ) : (
-                        notifications.map((notif, idx) => {
-                          const colorClass = notifColors[notif.type] || 'text-slate-600 bg-slate-100'
-                          return (
-                            <div
-                              key={notif._id || idx}
-                              className={`flex items-start gap-3 p-3 hover:bg-slate-50 transition cursor-pointer border-b border-slate-50 last:border-0 ${!notif.read ? 'bg-emerald-50/40' : ''}`}
-                            >
-                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${colorClass}`}>
-                                <Bell className="w-4 h-4" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className={`text-sm ${notif.read ? 'text-slate-600' : 'text-slate-800 font-medium'}`}>
-                                  {notif.title}
-                                </p>
-                                <p className="text-xs text-slate-500 mt-0.5 truncate">{notif.message}</p>
-                                <p className="text-[10px] text-slate-300 mt-1">
-                                  {notif.createdAt ? new Date(notif.createdAt).toLocaleDateString('uz-UZ') : ''}
-                                </p>
-                              </div>
-                            </div>
-                          )
-                        })
-                      )}
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
 
             <div className="relative">
               <button
@@ -259,8 +199,8 @@ export default function AdminLayout({ user, onLogout }) {
 
               {userMenuOpen && (
                 <>
-                  <div className="fixed inset-0 z-10" onClick={() => setUserMenuOpen(false)} />
-                  <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-20 animate-fade-in">
+                  <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
+                  <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-xl shadow-2xl border border-slate-200 py-2 z-50 animate-fade-in">
                     <div className="px-4 py-2 border-b border-slate-100">
                       <p className="text-sm font-medium text-slate-800">{user?.name || 'Admin'}</p>
                       <p className="text-xs text-slate-500">{user?.email || 'admin@osonbiznes.uz'}</p>

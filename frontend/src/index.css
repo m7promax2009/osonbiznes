@@ -20,7 +20,7 @@
     box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   }
 
-  /* Marketplace (OsonBiznes) sahifalari har doim yorug' ko'rinishda bo'ladi —
+  /* Marketplace (OsonBozor) sahifalari har doim yorug' ko'rinishda bo'ladi —
      dark mode'da matn oq rangda bo'lib ko'rinmay qolmasligi uchun */
   .marketplace-page {
     color: #0f172a;

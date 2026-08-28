@@ -52,15 +52,31 @@ const customerSchema = new mongoose.Schema({
     default: 0,
   },
   lastOrderDate: Date,
-  // Navbat ishonchliligi — no-show (kelmaslik) tarixini kuzatish
-  bookingsCount: { type: Number, default: 0 },   // jami band qilingan navbatlar
-  completedCount: { type: Number, default: 0 },  // kelib, bajarilgan
-  noShowCount: { type: Number, default: 0 },     // kelmagan (no-show)
   rating: {
     type: Number,
     min: 0,
     max: 5,
     default: 0,
+  },
+  // Sodiqlik va Nasiya (Debt CRM)
+  debt: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
+  debtDueDate: {
+    type: Date,
+    default: null,
+  },
+  cashback: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
+  tier: {
+    type: String,
+    enum: ['Bronze', 'Silver', 'Gold', 'Platinum'],
+    default: 'Bronze',
   },
   isActive: {
     type: Boolean,

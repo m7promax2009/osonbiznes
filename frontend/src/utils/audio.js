@@ -1,142 +1,97 @@
-// Web Audio API Synthesizer for high-tech UI feedback sound effects
-class SoundController {
+// Web Audio API based sound synthesizer for UI feedback
+class SoundFX {
   constructor() {
-    this.enabled = localStorage.getItem('sound_enabled') !== 'false'
-    this.audioCtx = null
+    this.ctx = null
   }
 
-  init() {
-    if (!this.audioCtx && typeof window !== 'undefined') {
-      const AudioContext = window.AudioContext || window.webkitAudioContext
-      if (AudioContext) {
-        this.audioCtx = new AudioContext()
+  getAudioContext() {
+    if (!this.ctx && typeof window !== 'undefined') {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext
+      if (AudioCtx) {
+        this.ctx = new AudioCtx()
       }
     }
-    if (this.audioCtx && this.audioCtx.state === 'suspended') {
-      this.audioCtx.resume()
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {})
     }
+    return this.ctx
   }
 
-  toggleSound() {
-    this.enabled = !this.enabled
-    localStorage.setItem('sound_enabled', this.enabled ? 'true' : 'false')
-    return this.enabled
-  }
-
-  isSoundEnabled() {
-    return this.enabled
-  }
-
-  // Barcode scan beep sound
-  playBeep() {
-    if (!this.enabled) return
+  playTone(freq, type = 'sine', duration = 0.08, gainVal = 0.05) {
     try {
-      this.init()
-      if (!this.audioCtx) return
+      const ctx = this.getAudioContext()
+      if (!ctx) return
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
 
-      const osc = this.audioCtx.createOscillator()
-      const gain = this.audioCtx.createGain()
+      osc.type = type
+      osc.frequency.setValueAtTime(freq, ctx.currentTime)
 
-      osc.type = 'sine'
-      osc.frequency.setValueAtTime(1800, this.audioCtx.currentTime)
-      osc.frequency.exponentialRampToValueAtTime(2400, this.audioCtx.currentTime + 0.08)
-
-      gain.gain.setValueAtTime(0.15, this.audioCtx.currentTime)
-      gain.gain.exponentialRampToValueAtTime(0.001, this.audioCtx.currentTime + 0.08)
+      gain.gain.setValueAtTime(gainVal, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration)
 
       osc.connect(gain)
-      gain.connect(this.audioCtx.destination)
+      gain.connect(ctx.destination)
 
       osc.start()
-      osc.stop(this.audioCtx.currentTime + 0.08)
+      osc.stop(ctx.currentTime + duration)
     } catch (_) {}
   }
 
-  // Cash register cha-ching sound for POS sale
-  playCashChing() {
-    if (!this.enabled) return
-    try {
-      this.init()
-      if (!this.audioCtx) return
-
-      const now = this.audioCtx.currentTime
-
-      // Chime 1
-      const osc1 = this.audioCtx.createOscillator()
-      const gain1 = this.audioCtx.createGain()
-      osc1.type = 'triangle'
-      osc1.frequency.setValueAtTime(987.77, now) // B5
-      gain1.gain.setValueAtTime(0.2, now)
-      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.3)
-      osc1.connect(gain1)
-      gain1.connect(this.audioCtx.destination)
-      osc1.start(now)
-      osc1.stop(now + 0.3)
-
-      // Chime 2 (High E)
-      const osc2 = this.audioCtx.createOscillator()
-      const gain2 = this.audioCtx.createGain()
-      osc2.type = 'sine'
-      osc2.frequency.setValueAtTime(1318.51, now + 0.08) // E6
-      gain2.gain.setValueAtTime(0.25, now + 0.08)
-      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.5)
-      osc2.connect(gain2)
-      gain2.connect(this.audioCtx.destination)
-      osc2.start(now + 0.08)
-      osc2.stop(now + 0.5)
-    } catch (_) {}
-  }
-
-  // Soft click sound for buttons
   playClick() {
-    if (!this.enabled) return
-    try {
-      this.init()
-      if (!this.audioCtx) return
-
-      const now = this.audioCtx.currentTime
-      const osc = this.audioCtx.createOscillator()
-      const gain = this.audioCtx.createGain()
-
-      osc.type = 'sine'
-      osc.frequency.setValueAtTime(600, now)
-      osc.frequency.exponentialRampToValueAtTime(300, now + 0.04)
-
-      gain.gain.setValueAtTime(0.05, now)
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04)
-
-      osc.connect(gain)
-      gain.connect(this.audioCtx.destination)
-
-      osc.start(now)
-      osc.stop(now + 0.04)
-    } catch (_) {}
+    this.playTone(800, 'sine', 0.04, 0.03)
   }
 
-  // Success chime
-  playSuccess() {
-    if (!this.enabled) return
-    try {
-      this.init()
-      if (!this.audioCtx) return
+  playBeep() {
+    this.playTone(1200, 'sine', 0.08, 0.06)
+  }
 
-      const now = this.audioCtx.currentTime
-      const notes = [523.25, 659.25, 783.99, 1046.50] // C5, E5, G5, C6
+  playSuccess() {
+    try {
+      const ctx = this.getAudioContext()
+      if (!ctx) return
+      const now = ctx.currentTime
+      const notes = [523.25, 659.25, 783.99] // C5, E5, G5
       notes.forEach((freq, idx) => {
-        const osc = this.audioCtx.createOscillator()
-        const gain = this.audioCtx.createGain()
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
         osc.type = 'sine'
-        osc.frequency.setValueAtTime(freq, now + idx * 0.06)
-        gain.gain.setValueAtTime(0.12, now + idx * 0.06)
-        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.25)
+        osc.frequency.setValueAtTime(freq, now + idx * 0.07)
+        gain.gain.setValueAtTime(0.05, now + idx * 0.07)
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.07 + 0.12)
         osc.connect(gain)
-        gain.connect(this.audioCtx.destination)
-        osc.start(now + idx * 0.06)
-        osc.stop(now + idx * 0.06 + 0.25)
+        gain.connect(ctx.destination)
+        osc.start(now + idx * 0.07)
+        osc.stop(now + idx * 0.07 + 0.12)
       })
     } catch (_) {}
   }
+
+  playCashChing() {
+    try {
+      const ctx = this.getAudioContext()
+      if (!ctx) return
+      const now = ctx.currentTime
+      const notes = [987.77, 1318.51] // B5, E6
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.type = 'triangle'
+        osc.frequency.setValueAtTime(freq, now + idx * 0.08)
+        gain.gain.setValueAtTime(0.07, now + idx * 0.08)
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.08 + 0.25)
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.start(now + idx * 0.08)
+        osc.stop(now + idx * 0.08 + 0.25)
+      })
+    } catch (_) {}
+  }
+
+  playError() {
+    this.playTone(220, 'sawtooth', 0.15, 0.05)
+  }
 }
 
-export const sounds = new SoundController()
+export const sounds = new SoundFX()
 export default sounds

@@ -116,17 +116,54 @@ router.post('/', authenticate, requireActiveSubscription, async (req, res) => {
       notes: notes || '',
     })
 
-    // Update customer stats
+    // Update customer stats & Nasiya CRM
     let customerDoc = await Customer.findOne({
       userId: req.user.id,
       name: { $regex: `^${escapeRegex(customer)}$`, $options: 'i' },
     })
 
+    const isNasiya = paymentMethod === 'nasiya'
+
     if (customerDoc) {
       customerDoc.totalOrders += 1
       customerDoc.totalSpent += total
       customerDoc.lastOrderDate = new Date()
+      if (isNasiya) {
+        customerDoc.debt = (customerDoc.debt || 0) + total
+        if (!customerDoc.debtDueDate) {
+          customerDoc.debtDueDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+        }
+      }
+      // Sodiqlik keshbeki (1%) va Tier yangilash
+      customerDoc.cashback = (customerDoc.cashback || 0) + Math.round(total * 0.01)
+      if (customerDoc.totalSpent >= 50000000) customerDoc.tier = 'Platinum'
+      else if (customerDoc.totalSpent >= 20000000) customerDoc.tier = 'Gold'
+      else if (customerDoc.totalSpent >= 5000000) customerDoc.tier = 'Silver'
+      else customerDoc.tier = 'Bronze'
       await customerDoc.save()
+    } else {
+      // Yangi mijozni avtomatik yaratish
+      try {
+        let initialTier = 'Bronze'
+        if (total >= 50000000) initialTier = 'Platinum'
+        else if (total >= 20000000) initialTier = 'Gold'
+        else if (total >= 5000000) initialTier = 'Silver'
+
+        customerDoc = await Customer.create({
+          userId: req.user.id,
+          name: customer,
+          phone: phone || '',
+          totalOrders: 1,
+          totalSpent: total,
+          lastOrderDate: new Date(),
+          debt: isNasiya ? total : 0,
+          debtDueDate: isNasiya ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) : null,
+          cashback: Math.round(total * 0.01),
+          tier: initialTier,
+          tags: isNasiya ? ['Nasiya'] : ['Yangi'],
+        })
+        await User.findByIdAndUpdate(req.user.id, { $inc: { totalCustomers: 1 } })
+      } catch (_) {}
     }
 
     // Update user stats
@@ -177,12 +214,32 @@ router.put('/:id/status', authenticate, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Notogri tolov holati' })
     }
 
+    const currentOrder = await Order.findOne({ _id: req.params.id, userId: req.user.id })
+    if (!currentOrder) return res.status(404).json({ success: false, message: 'Buyurtma topilmadi' })
+
+    const oldStatus = currentOrder.status
+    const newStatus = status || oldStatus
+
+    // Stok boshqaruvi: bekor qilinsa omborga qaytarish, qayta faollashsa yana kamaytirish
+    if (oldStatus !== 'cancelled' && newStatus === 'cancelled') {
+      for (const item of (currentOrder.items || [])) {
+        await Product.updateOne(
+          { userId: req.user.id, name: item.name },
+          { $inc: { stock: item.qty } }
+        )
+      }
+    } else if (oldStatus === 'cancelled' && newStatus !== 'cancelled') {
+      for (const item of (currentOrder.items || [])) {
+        await Product.updateOne(
+          { userId: req.user.id, name: item.name, stock: { $gte: item.qty } },
+          { $inc: { stock: -item.qty } }
+        )
+      }
+    }
+
     const update = {}
     if (status) update.status = status
     if (payment) update.payment = payment
-    if (!Object.keys(update).length) {
-      return res.status(400).json({ success: false, message: 'Ozgartirish uchun status yoki tolov kerak' })
-    }
 
     const order = await Order.findOneAndUpdate(
       { _id: req.params.id, userId: req.user.id },
@@ -190,14 +247,13 @@ router.put('/:id/status', authenticate, async (req, res) => {
       { new: true, runValidators: true }
     )
 
-    if (!order) return res.status(404).json({ success: false, message: 'Buyurtma topilmadi' })
     res.json({ success: true, data: order })
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server xatoligi' })
   }
 })
 
-// GET /api/orders/analytics - 7/30 kunlik tushum va kategoriya taqsimoti
+// GET /api/orders/analytics - 7/30 kunlik tushum, foyda va kategoriya taqsimoti
 router.get('/analytics', authenticate, async (req, res) => {
   try {
     const { range = '7d' } = req.query
@@ -207,12 +263,19 @@ router.get('/analytics', authenticate, async (req, res) => {
     startDate.setDate(now.getDate() - days + 1)
     startDate.setHours(0, 0, 0, 0)
 
-    // Kunlik tushum
+    // Mahsulotlar tannarxini olish
+    const userProducts = await Product.find({ userId: req.user.id }).select('name price cost category').lean()
+    const productCostMap = {}
+    userProducts.forEach(p => {
+      productCostMap[p.name.toLowerCase()] = p.cost || 0
+    })
+
+    // Buyurtmalar
     const orders = await Order.find({
       userId: req.user.id,
       createdAt: { $gte: startDate },
       status: { $ne: 'cancelled' },
-    }).select('total items createdAt').lean()
+    }).select('total items createdAt customer paymentMethod').lean()
 
     // Kunlar bo'yicha guruhlash
     const dayMap = {}
@@ -220,19 +283,50 @@ router.get('/analytics', authenticate, async (req, res) => {
       const d = new Date(startDate)
       d.setDate(startDate.getDate() + i)
       const key = d.toLocaleDateString('uz-UZ', { weekday: 'short', month: 'numeric', day: 'numeric' })
-      dayMap[key] = { day: key, tushum: 0, buyurtmalar: 0 }
+      dayMap[key] = { day: key, tushum: 0, foyda: 0, buyurtmalar: 0 }
     }
+
+    let totalPeriodRevenue = 0
+    let totalPeriodCost = 0
+    const topProductMap = {}
 
     for (const order of orders) {
       const d = new Date(order.createdAt)
       const key = d.toLocaleDateString('uz-UZ', { weekday: 'short', month: 'numeric', day: 'numeric' })
+      let orderCost = 0
+
+      for (const item of (order.items || [])) {
+        const itemCost = (productCostMap[item.name.toLowerCase()] || (item.price * 0.7)) * item.qty
+        orderCost += itemCost
+
+        // Top products tracking
+        if (!topProductMap[item.name]) {
+          topProductMap[item.name] = { name: item.name, qty: 0, total: 0, category: item.category || 'Boshqa' }
+        }
+        topProductMap[item.name].qty += item.qty
+        topProductMap[item.name].total += (item.price * item.qty)
+      }
+
+      const orderRevenue = order.total || 0
+      const orderProfit = Math.max(0, orderRevenue - orderCost)
+      totalPeriodRevenue += orderRevenue
+      totalPeriodCost += orderCost
+
       if (dayMap[key]) {
-        dayMap[key].tushum += order.total || 0
+        dayMap[key].tushum += orderRevenue
+        dayMap[key].foyda += orderProfit
         dayMap[key].buyurtmalar += 1
       }
     }
 
     const chartData = Object.values(dayMap)
+    const netProfit = Math.max(0, totalPeriodRevenue - totalPeriodCost)
+    const profitMargin = totalPeriodRevenue > 0 ? Math.round((netProfit / totalPeriodRevenue) * 100) : 0
+
+    // Top selling products
+    const topProducts = Object.values(topProductMap)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5)
 
     // Kategoriyalar bo'yicha sotuv
     const categoryMap = {}
@@ -277,7 +371,15 @@ router.get('/analytics', authenticate, async (req, res) => {
 
     res.json({
       success: true,
-      data: { chartData, categoryData, hourlyData },
+      data: {
+        chartData,
+        categoryData,
+        hourlyData,
+        topProducts,
+        totalPeriodRevenue,
+        netProfit,
+        profitMargin,
+      },
     })
   } catch (error) {
     console.error('Analytics error:', error)
@@ -294,6 +396,16 @@ router.delete('/:id', authenticate, async (req, res) => {
       { new: true }
     )
     if (!order) return res.status(404).json({ success: false, message: 'Buyurtma topilmadi' })
+
+    // Agar buyurtma bekor qilinmagan bo'lsa, ombordagi qoldiqni tiklaymiz
+    if (order.status !== 'cancelled') {
+      for (const item of (order.items || [])) {
+        await Product.updateOne(
+          { userId: req.user.id, name: item.name },
+          { $inc: { stock: item.qty } }
+        )
+      }
+    }
 
     // Faqat haqiqatan o'chirilganda hisobni kamaytiramiz (double-delete drift oldini olish)
     await User.findByIdAndUpdate(req.user.id, { $inc: { totalOrders: -1, totalRevenue: -order.total } })
