@@ -1,13 +1,15 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+const API_URL = import.meta.env.VITE_API_URL || '/api'
 
-// /uploads/... kabi nisbiy rasm yo'llarini backend origin bilan to'ldirish
-// (frontend 3000-portda, rasmlar 5000-portda saqlanadi)
+// /uploads/... kabi nisbiy rasm yo'llarini to'ldirish
 export function resolveImageUrl(src) {
   if (!src) return ''
   if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:')) return src
   if (src.startsWith('/uploads/')) {
-    const origin = API_URL.replace(/\/api\/?$/, '')
-    return `${origin}${src}`
+    if (API_URL.startsWith('http')) {
+      const origin = API_URL.replace(/\/api\/?$/, '')
+      return `${origin}${src}`
+    }
+    return src
   }
   return src
 }

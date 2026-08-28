@@ -11,14 +11,16 @@ dotenv.config()
 const app = express()
 
 // Middleware
+// Middleware
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000'
-// www va www'siz variantni ham qabul qilamiz (nginx ikkalasiga xizmat qiladi)
 const allowedOrigins = new Set([FRONTEND_URL, FRONTEND_URL.replace('://', '://www.')])
 app.use(cors({
   origin: (origin, cb) => {
-    // origin yo'q (mobil ilova, curl, Telegram bot) — ruxsat
-    if (!origin || allowedOrigins.has(origin)) return cb(null, true)
-    return cb(new Error('CORS: ruxsat berilmagan origin'))
+    // origin yo'q (mobil ilova, curl, Telegram bot) yoki istalgan manba — ruxsat
+    if (!origin || allowedOrigins.has(origin) || origin.includes('localhost') || origin.includes('127.0.0.1') || origin.endsWith('.trycloudflare.com') || origin.endsWith('.loca.lt') || origin.endsWith('.onrender.com') || origin.endsWith('.vercel.app')) {
+      return cb(null, true)
+    }
+    return cb(null, true) // Preview va tashqi ulanishlar uchun ochiq
   },
   credentials: true,
 }))
