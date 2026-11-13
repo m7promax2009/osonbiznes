@@ -112,6 +112,14 @@ router.put('/:id', authenticate, async (req, res) => {
     if (address !== undefined) update.address = address
     if (notes !== undefined) update.notes = notes
     if (tags !== undefined) update.tags = tags
+    for (const [k, v] of [['debt', debt], ['cashback', cashback]]) {
+      if (v !== undefined && !Number.isFinite(Number(v))) {
+        return res.status(400).json({ success: false, message: `${k} son bo'lishi kerak` })
+      }
+    }
+    if (tier !== undefined && !['Bronze', 'Silver', 'Gold', 'Platinum'].includes(tier)) {
+      return res.status(400).json({ success: false, message: "Noto'g'ri daraja" })
+    }
     if (debt !== undefined) update.debt = Math.max(0, Number(debt))
     if (debtDueDate !== undefined) update.debtDueDate = debtDueDate ? new Date(debtDueDate) : null
     if (cashback !== undefined) update.cashback = Math.max(0, Number(cashback))
@@ -120,7 +128,7 @@ router.put('/:id', authenticate, async (req, res) => {
     const customer = await Customer.findOneAndUpdate(
       { _id: req.params.id, userId: req.user.id },
       { $set: update },
-      { new: true }
+      { new: true, runValidators: true }
     )
 
     if (!customer) return res.status(404).json({ success: false, message: 'Mijoz topilmadi' })

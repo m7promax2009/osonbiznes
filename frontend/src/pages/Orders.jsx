@@ -89,7 +89,7 @@ export default function Orders() {
     }
   }
 
-  const formatPrice = (p) => new Intl.NumberFormat('uz-UZ').format(p || 0) + " so'm"
+  const formatPrice = (p) => new Intl.NumberFormat('ru-RU').format(p || 0) + " so'm"
 
   const kanbanColumns = [
     { id: 'pending', title: 'Kutilmoqda', color: 'border-amber-500 bg-amber-500/10 text-amber-600' },

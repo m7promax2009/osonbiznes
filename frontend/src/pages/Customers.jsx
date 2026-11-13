@@ -84,7 +84,7 @@ export default function Customers() {
     } catch (_) {}
   }
 
-  const formatPrice = (p) => new Intl.NumberFormat('uz-UZ').format(p || 0) + " so'm"
+  const formatPrice = (p) => new Intl.NumberFormat('ru-RU').format(p || 0) + " so'm"
 
   const sendTelegramReminder = (customer) => {
     sounds.playClick()

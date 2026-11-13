@@ -1,0 +1,744 @@
+[
+ {
+  "name": "iPhone 5s",
+  "brand": "Apple",
+  "category": "Smartfonlar",
+  "usd": 199.99,
+  "images": [
+   "/uploads/demo/smartphones/iphone-5s-1.webp",
+   "/uploads/demo/smartphones/iphone-5s-2.webp",
+   "/uploads/demo/smartphones/iphone-5s-3.webp"
+  ],
+  "source": "smartphones"
+ },
+ {
+  "name": "iPhone 6",
+  "brand": "Apple",
+  "category": "Smartfonlar",
+  "usd": 299.99,
+  "images": [
+   "/uploads/demo/smartphones/iphone-6-1.webp",
+   "/uploads/demo/smartphones/iphone-6-2.webp",
+   "/uploads/demo/smartphones/iphone-6-3.webp"
+  ],
+  "source": "smartphones"
+ },
+ {
+  "name": "iPhone 13 Pro",
+  "brand": "Apple",
+  "category": "Smartfonlar",
+  "usd": 1099.99,
+  "images": [
+   "/uploads/demo/smartphones/iphone-13-pro-1.webp",
+   "/uploads/demo/smartphones/iphone-13-pro-2.webp",
+   "/uploads/demo/smartphones/iphone-13-pro-3.webp"
+  ],
+  "source": "smartphones"
+ },
+ {
+  "name": "iPhone X",
+  "brand": "Apple",
+  "category": "Smartfonlar",
+  "usd": 899.99,
+  "images": [
+   "/uploads/demo/smartphones/iphone-x-1.webp",
+   "/uploads/demo/smartphones/iphone-x-2.webp",
+   "/uploads/demo/smartphones/iphone-x-3.webp"
+  ],
+  "source": "smartphones"
+ },
+ {
+  "name": "Oppo A57",
+  "brand": "Oppo",
+  "category": "Smartfonlar",
+  "usd": 249.99,
+  "images": [
+   "/uploads/demo/smartphones/oppo-a57-1.webp",
+   "/uploads/demo/smartphones/oppo-a57-2.webp",
+   "/uploads/demo/smartphones/oppo-a57-3.webp"
+  ],
+  "source": "smartphones"
+ },
+ {
+  "name": "Oppo F19 Pro Plus",
+  "brand": "Oppo",
+  "category": "Smartfonlar",
+  "usd": 399.99,
+  "images": [
+   "/uploads/demo/smartphones/oppo-f19-pro-plus-1.webp",
+   "/uploads/demo/smartphones/oppo-f19-pro-plus-2.webp",
+   "/uploads/demo/smartphones/oppo-f19-pro-plus-3.webp"
+  ],
+  "source": "smartphones"
+ },
+ {
+  "name": "Oppo K1",
+  "brand": "Oppo",
+  "category": "Smartfonlar",
+  "usd": 299.99,
+  "images": [
+   "/uploads/demo/smartphones/oppo-k1-1.webp",
+   "/uploads/demo/smartphones/oppo-k1-2.webp",
+   "/uploads/demo/smartphones/oppo-k1-3.webp"
+  ],
+  "source": "smartphones"
+ },
+ {
+  "name": "Realme C35",
+  "brand": "Realme",
+  "category": "Smartfonlar",
+  "usd": 149.99,
+  "images": [
+   "/uploads/demo/smartphones/realme-c35-1.webp",
+   "/uploads/demo/smartphones/realme-c35-2.webp",
+   "/uploads/demo/smartphones/realme-c35-3.webp"
+  ],
+  "source": "smartphones"
+ },
+ {
+  "name": "Realme X",
+  "brand": "Realme",
+  "category": "Smartfonlar",
+  "usd": 299.99,
+  "images": [
+   "/uploads/demo/smartphones/realme-x-1.webp",
+   "/uploads/demo/smartphones/realme-x-2.webp",
+   "/uploads/demo/smartphones/realme-x-3.webp"
+  ],
+  "source": "smartphones"
+ },
+ {
+  "name": "Realme XT",
+  "brand": "Realme",
+  "category": "Smartfonlar",
+  "usd": 349.99,
+  "images": [
+   "/uploads/demo/smartphones/realme-xt-1.webp",
+   "/uploads/demo/smartphones/realme-xt-2.webp",
+   "/uploads/demo/smartphones/realme-xt-3.webp"
+  ],
+  "source": "smartphones"
+ },
+ {
+  "name": "Samsung Galaxy S7",
+  "brand": "Samsung",
+  "category": "Smartfonlar",
+  "usd": 299.99,
+  "images": [
+   "/uploads/demo/smartphones/samsung-galaxy-s7-1.webp",
+   "/uploads/demo/smartphones/samsung-galaxy-s7-2.webp",
+   "/uploads/demo/smartphones/samsung-galaxy-s7-3.webp"
+  ],
+  "source": "smartphones"
+ },
+ {
+  "name": "Samsung Galaxy S8",
+  "brand": "Samsung",
+  "category": "Smartfonlar",
+  "usd": 499.99,
+  "images": [
+   "/uploads/demo/smartphones/samsung-galaxy-s8-1.webp",
+   "/uploads/demo/smartphones/samsung-galaxy-s8-2.webp",
+   "/uploads/demo/smartphones/samsung-galaxy-s8-3.webp"
+  ],
+  "source": "smartphones"
+ },
+ {
+  "name": "Apple MacBook Pro 14 Inch Space Grey",
+  "brand": "Apple",
+  "category": "Noutbuklar",
+  "usd": 1999.99,
+  "images": [
+   "/uploads/demo/laptops/apple-macbook-pro-14-inch-space-grey-1.webp",
+   "/uploads/demo/laptops/apple-macbook-pro-14-inch-space-grey-2.webp",
+   "/uploads/demo/laptops/apple-macbook-pro-14-inch-space-grey-3.webp"
+  ],
+  "source": "laptops"
+ },
+ {
+  "name": "Asus Zenbook Pro Dual Screen Laptop",
+  "brand": "Asus",
+  "category": "Noutbuklar",
+  "usd": 1799.99,
+  "images": [
+   "/uploads/demo/laptops/asus-zenbook-pro-dual-screen-laptop-1.webp",
+   "/uploads/demo/laptops/asus-zenbook-pro-dual-screen-laptop-2.webp",
+   "/uploads/demo/laptops/asus-zenbook-pro-dual-screen-laptop-3.webp"
+  ],
+  "source": "laptops"
+ },
+ {
+  "name": "Huawei Matebook X Pro",
+  "brand": "Huawei",
+  "category": "Noutbuklar",
+  "usd": 1399.99,
+  "images": [
+   "/uploads/demo/laptops/huawei-matebook-x-pro-1.webp",
+   "/uploads/demo/laptops/huawei-matebook-x-pro-2.webp",
+   "/uploads/demo/laptops/huawei-matebook-x-pro-3.webp"
+  ],
+  "source": "laptops"
+ },
+ {
+  "name": "Lenovo Yoga 920",
+  "brand": "Lenovo",
+  "category": "Noutbuklar",
+  "usd": 1099.99,
+  "images": [
+   "/uploads/demo/laptops/lenovo-yoga-920-1.webp",
+   "/uploads/demo/laptops/lenovo-yoga-920-2.webp",
+   "/uploads/demo/laptops/lenovo-yoga-920-3.webp"
+  ],
+  "source": "laptops"
+ },
+ {
+  "name": "New DELL XPS 13 9300 Laptop",
+  "brand": "Dell",
+  "category": "Noutbuklar",
+  "usd": 1499.99,
+  "images": [
+   "/uploads/demo/laptops/new-dell-xps-13-9300-laptop-1.webp",
+   "/uploads/demo/laptops/new-dell-xps-13-9300-laptop-2.webp",
+   "/uploads/demo/laptops/new-dell-xps-13-9300-laptop-3.webp"
+  ],
+  "source": "laptops"
+ },
+ {
+  "name": "iPad Mini 2021 Starlight",
+  "brand": "Apple",
+  "category": "Planshetlar",
+  "usd": 499.99,
+  "images": [
+   "/uploads/demo/tablets/ipad-mini-2021-starlight-1.webp",
+   "/uploads/demo/tablets/ipad-mini-2021-starlight-2.webp",
+   "/uploads/demo/tablets/ipad-mini-2021-starlight-3.webp"
+  ],
+  "source": "tablets"
+ },
+ {
+  "name": "Samsung Galaxy Tab S8 Plus Grey",
+  "brand": "Samsung",
+  "category": "Planshetlar",
+  "usd": 599.99,
+  "images": [
+   "/uploads/demo/tablets/samsung-galaxy-tab-s8-plus-grey-1.webp",
+   "/uploads/demo/tablets/samsung-galaxy-tab-s8-plus-grey-2.webp",
+   "/uploads/demo/tablets/samsung-galaxy-tab-s8-plus-grey-3.webp"
+  ],
+  "source": "tablets"
+ },
+ {
+  "name": "Samsung Galaxy Tab White",
+  "brand": "Samsung",
+  "category": "Planshetlar",
+  "usd": 349.99,
+  "images": [
+   "/uploads/demo/tablets/samsung-galaxy-tab-white-1.webp",
+   "/uploads/demo/tablets/samsung-galaxy-tab-white-2.webp",
+   "/uploads/demo/tablets/samsung-galaxy-tab-white-3.webp"
+  ],
+  "source": "tablets"
+ },
+ {
+  "name": "Amazon Echo Plus",
+  "brand": "Amazon",
+  "category": "Aksessuarlar",
+  "usd": 99.99,
+  "images": [
+   "/uploads/demo/mobile-accessories/amazon-echo-plus-1.webp",
+   "/uploads/demo/mobile-accessories/amazon-echo-plus-2.webp"
+  ],
+  "source": "mobile-accessories"
+ },
+ {
+  "name": "Apple Airpods",
+  "brand": "Apple",
+  "category": "Aksessuarlar",
+  "usd": 129.99,
+  "images": [
+   "/uploads/demo/mobile-accessories/apple-airpods-1.webp",
+   "/uploads/demo/mobile-accessories/apple-airpods-2.webp",
+   "/uploads/demo/mobile-accessories/apple-airpods-3.webp"
+  ],
+  "source": "mobile-accessories"
+ },
+ {
+  "name": "Apple AirPods Max Silver",
+  "brand": "Apple",
+  "category": "Aksessuarlar",
+  "usd": 549.99,
+  "images": [
+   "/uploads/demo/mobile-accessories/apple-airpods-max-silver-1.webp"
+  ],
+  "source": "mobile-accessories"
+ },
+ {
+  "name": "Apple Airpower Wireless Charger",
+  "brand": "Apple",
+  "category": "Aksessuarlar",
+  "usd": 79.99,
+  "images": [
+   "/uploads/demo/mobile-accessories/apple-airpower-wireless-charger-1.webp"
+  ],
+  "source": "mobile-accessories"
+ },
+ {
+  "name": "Apple HomePod Mini Cosmic Grey",
+  "brand": "Apple",
+  "category": "Aksessuarlar",
+  "usd": 99.99,
+  "images": [
+   "/uploads/demo/mobile-accessories/apple-homepod-mini-cosmic-grey-1.webp"
+  ],
+  "source": "mobile-accessories"
+ },
+ {
+  "name": "Apple iPhone Charger",
+  "brand": "Apple",
+  "category": "Aksessuarlar",
+  "usd": 19.99,
+  "images": [
+   "/uploads/demo/mobile-accessories/apple-iphone-charger-1.webp",
+   "/uploads/demo/mobile-accessories/apple-iphone-charger-2.webp"
+  ],
+  "source": "mobile-accessories"
+ },
+ {
+  "name": "Apple MagSafe Battery Pack",
+  "brand": "Apple",
+  "category": "Aksessuarlar",
+  "usd": 99.99,
+  "images": [
+   "/uploads/demo/mobile-accessories/apple-magsafe-battery-pack-1.webp",
+   "/uploads/demo/mobile-accessories/apple-magsafe-battery-pack-2.webp"
+  ],
+  "source": "mobile-accessories"
+ },
+ {
+  "name": "Apple Watch Series 4 Gold",
+  "brand": "Apple",
+  "category": "Aksessuarlar",
+  "usd": 349.99,
+  "images": [
+   "/uploads/demo/mobile-accessories/apple-watch-series-4-gold-1.webp",
+   "/uploads/demo/mobile-accessories/apple-watch-series-4-gold-2.webp",
+   "/uploads/demo/mobile-accessories/apple-watch-series-4-gold-3.webp"
+  ],
+  "source": "mobile-accessories"
+ },
+ {
+  "name": "Beats Flex Wireless Earphones",
+  "brand": "Beats",
+  "category": "Aksessuarlar",
+  "usd": 49.99,
+  "images": [
+   "/uploads/demo/mobile-accessories/beats-flex-wireless-earphones-1.webp"
+  ],
+  "source": "mobile-accessories"
+ },
+ {
+  "name": "iPhone 12 Silicone Case with MagSafe Plum",
+  "brand": "Apple",
+  "category": "Aksessuarlar",
+  "usd": 29.99,
+  "images": [
+   "/uploads/demo/mobile-accessories/iphone-12-silicone-case-with-magsafe-plum-1.webp",
+   "/uploads/demo/mobile-accessories/iphone-12-silicone-case-with-magsafe-plum-2.webp",
+   "/uploads/demo/mobile-accessories/iphone-12-silicone-case-with-magsafe-plum-3.webp"
+  ],
+  "source": "mobile-accessories"
+ },
+ {
+  "name": "Monopod",
+  "brand": "TechGear",
+  "category": "Aksessuarlar",
+  "usd": 19.99,
+  "images": [
+   "/uploads/demo/mobile-accessories/monopod-1.webp",
+   "/uploads/demo/mobile-accessories/monopod-2.webp"
+  ],
+  "source": "mobile-accessories"
+ },
+ {
+  "name": "Selfie Lamp with iPhone",
+  "brand": "GadgetMaster",
+  "category": "Aksessuarlar",
+  "usd": 14.99,
+  "images": [
+   "/uploads/demo/mobile-accessories/selfie-lamp-with-iphone-1.webp"
+  ],
+  "source": "mobile-accessories"
+ },
+ {
+  "name": "Brown Leather Belt Watch",
+  "brand": "Fashion Timepieces",
+  "category": "Soatlar",
+  "usd": 89.99,
+  "images": [
+   "/uploads/demo/mens-watches/brown-leather-belt-watch-1.webp",
+   "/uploads/demo/mens-watches/brown-leather-belt-watch-2.webp",
+   "/uploads/demo/mens-watches/brown-leather-belt-watch-3.webp"
+  ],
+  "source": "mens-watches"
+ },
+ {
+  "name": "Longines Master Collection",
+  "brand": "Longines",
+  "category": "Soatlar",
+  "usd": 1499.99,
+  "images": [
+   "/uploads/demo/mens-watches/longines-master-collection-1.webp",
+   "/uploads/demo/mens-watches/longines-master-collection-2.webp",
+   "/uploads/demo/mens-watches/longines-master-collection-3.webp"
+  ],
+  "source": "mens-watches"
+ },
+ {
+  "name": "Rolex Cellini Date Black Dial",
+  "brand": "Rolex",
+  "category": "Soatlar",
+  "usd": 8999.99,
+  "images": [
+   "/uploads/demo/mens-watches/rolex-cellini-date-black-dial-1.webp",
+   "/uploads/demo/mens-watches/rolex-cellini-date-black-dial-2.webp",
+   "/uploads/demo/mens-watches/rolex-cellini-date-black-dial-3.webp"
+  ],
+  "source": "mens-watches"
+ },
+ {
+  "name": "Rolex Cellini Moonphase",
+  "brand": "Rolex",
+  "category": "Soatlar",
+  "usd": 12999.99,
+  "images": [
+   "/uploads/demo/mens-watches/rolex-cellini-moonphase-1.webp",
+   "/uploads/demo/mens-watches/rolex-cellini-moonphase-2.webp",
+   "/uploads/demo/mens-watches/rolex-cellini-moonphase-3.webp"
+  ],
+  "source": "mens-watches"
+ },
+ {
+  "name": "Rolex Datejust",
+  "brand": "Rolex",
+  "category": "Soatlar",
+  "usd": 10999.99,
+  "images": [
+   "/uploads/demo/mens-watches/rolex-datejust-1.webp",
+   "/uploads/demo/mens-watches/rolex-datejust-2.webp",
+   "/uploads/demo/mens-watches/rolex-datejust-3.webp"
+  ],
+  "source": "mens-watches"
+ },
+ {
+  "name": "Rolex Submariner Watch",
+  "brand": "Rolex",
+  "category": "Soatlar",
+  "usd": 13999.99,
+  "images": [
+   "/uploads/demo/mens-watches/rolex-submariner-watch-1.webp",
+   "/uploads/demo/mens-watches/rolex-submariner-watch-2.webp",
+   "/uploads/demo/mens-watches/rolex-submariner-watch-3.webp"
+  ],
+  "source": "mens-watches"
+ },
+ {
+  "name": "IWC Ingenieur Automatic Steel",
+  "brand": "IWC",
+  "category": "Soatlar",
+  "usd": 4999.99,
+  "images": [
+   "/uploads/demo/womens-watches/iwc-ingenieur-automatic-steel-1.webp",
+   "/uploads/demo/womens-watches/iwc-ingenieur-automatic-steel-2.webp",
+   "/uploads/demo/womens-watches/iwc-ingenieur-automatic-steel-3.webp"
+  ],
+  "source": "womens-watches"
+ },
+ {
+  "name": "Rolex Cellini Moonphase",
+  "brand": "Rolex",
+  "category": "Soatlar",
+  "usd": 15999.99,
+  "images": [
+   "/uploads/demo/womens-watches/rolex-cellini-moonphase-1.webp",
+   "/uploads/demo/womens-watches/rolex-cellini-moonphase-2.webp",
+   "/uploads/demo/womens-watches/rolex-cellini-moonphase-3.webp"
+  ],
+  "source": "womens-watches"
+ },
+ {
+  "name": "Rolex Datejust Women",
+  "brand": "Rolex",
+  "category": "Soatlar",
+  "usd": 10999.99,
+  "images": [
+   "/uploads/demo/womens-watches/rolex-datejust-women-1.webp",
+   "/uploads/demo/womens-watches/rolex-datejust-women-2.webp",
+   "/uploads/demo/womens-watches/rolex-datejust-women-3.webp"
+  ],
+  "source": "womens-watches"
+ },
+ {
+  "name": "Watch Gold for Women",
+  "brand": "Fashion Gold",
+  "category": "Soatlar",
+  "usd": 799.99,
+  "images": [
+   "/uploads/demo/womens-watches/watch-gold-for-women-1.webp",
+   "/uploads/demo/womens-watches/watch-gold-for-women-2.webp",
+   "/uploads/demo/womens-watches/watch-gold-for-women-3.webp"
+  ],
+  "source": "womens-watches"
+ },
+ {
+  "name": "Women's Wrist Watch",
+  "brand": "Fashion Co.",
+  "category": "Soatlar",
+  "usd": 129.99,
+  "images": [
+   "/uploads/demo/womens-watches/women-s-wrist-watch-1.webp",
+   "/uploads/demo/womens-watches/women-s-wrist-watch-2.webp",
+   "/uploads/demo/womens-watches/women-s-wrist-watch-3.webp"
+  ],
+  "source": "womens-watches"
+ },
+ {
+  "name": "Calvin Klein CK One",
+  "brand": "Calvin Klein",
+  "category": "Parfyumeriya",
+  "usd": 49.99,
+  "images": [
+   "/uploads/demo/fragrances/calvin-klein-ck-one-1.webp",
+   "/uploads/demo/fragrances/calvin-klein-ck-one-2.webp",
+   "/uploads/demo/fragrances/calvin-klein-ck-one-3.webp"
+  ],
+  "source": "fragrances"
+ },
+ {
+  "name": "Chanel Coco Noir Eau De",
+  "brand": "Chanel",
+  "category": "Parfyumeriya",
+  "usd": 129.99,
+  "images": [
+   "/uploads/demo/fragrances/chanel-coco-noir-eau-de-1.webp",
+   "/uploads/demo/fragrances/chanel-coco-noir-eau-de-2.webp",
+   "/uploads/demo/fragrances/chanel-coco-noir-eau-de-3.webp"
+  ],
+  "source": "fragrances"
+ },
+ {
+  "name": "Dior J'adore",
+  "brand": "Dior",
+  "category": "Parfyumeriya",
+  "usd": 89.99,
+  "images": [
+   "/uploads/demo/fragrances/dior-j-adore-1.webp",
+   "/uploads/demo/fragrances/dior-j-adore-2.webp",
+   "/uploads/demo/fragrances/dior-j-adore-3.webp"
+  ],
+  "source": "fragrances"
+ },
+ {
+  "name": "Dolce Shine Eau de",
+  "brand": "Dolce & Gabbana",
+  "category": "Parfyumeriya",
+  "usd": 69.99,
+  "images": [
+   "/uploads/demo/fragrances/dolce-shine-eau-de-1.webp",
+   "/uploads/demo/fragrances/dolce-shine-eau-de-2.webp",
+   "/uploads/demo/fragrances/dolce-shine-eau-de-3.webp"
+  ],
+  "source": "fragrances"
+ },
+ {
+  "name": "Gucci Bloom Eau de",
+  "brand": "Gucci",
+  "category": "Parfyumeriya",
+  "usd": 79.99,
+  "images": [
+   "/uploads/demo/fragrances/gucci-bloom-eau-de-1.webp",
+   "/uploads/demo/fragrances/gucci-bloom-eau-de-2.webp",
+   "/uploads/demo/fragrances/gucci-bloom-eau-de-3.webp"
+  ],
+  "source": "fragrances"
+ },
+ {
+  "name": "Nike Air Jordan 1 Red And Black",
+  "brand": "Nike",
+  "category": "Poyabzal",
+  "usd": 149.99,
+  "images": [
+   "/uploads/demo/mens-shoes/nike-air-jordan-1-red-and-black-1.webp",
+   "/uploads/demo/mens-shoes/nike-air-jordan-1-red-and-black-2.webp",
+   "/uploads/demo/mens-shoes/nike-air-jordan-1-red-and-black-3.webp"
+  ],
+  "source": "mens-shoes"
+ },
+ {
+  "name": "Nike Baseball Cleats",
+  "brand": "Nike",
+  "category": "Poyabzal",
+  "usd": 79.99,
+  "images": [
+   "/uploads/demo/mens-shoes/nike-baseball-cleats-1.webp",
+   "/uploads/demo/mens-shoes/nike-baseball-cleats-2.webp",
+   "/uploads/demo/mens-shoes/nike-baseball-cleats-3.webp"
+  ],
+  "source": "mens-shoes"
+ },
+ {
+  "name": "Puma Future Rider Trainers",
+  "brand": "Puma",
+  "category": "Poyabzal",
+  "usd": 89.99,
+  "images": [
+   "/uploads/demo/mens-shoes/puma-future-rider-trainers-1.webp",
+   "/uploads/demo/mens-shoes/puma-future-rider-trainers-2.webp",
+   "/uploads/demo/mens-shoes/puma-future-rider-trainers-3.webp"
+  ],
+  "source": "mens-shoes"
+ },
+ {
+  "name": "Sports Sneakers Off White & Red",
+  "brand": "Off White",
+  "category": "Poyabzal",
+  "usd": 119.99,
+  "images": [
+   "/uploads/demo/mens-shoes/sports-sneakers-off-white-red-1.webp",
+   "/uploads/demo/mens-shoes/sports-sneakers-off-white-red-2.webp",
+   "/uploads/demo/mens-shoes/sports-sneakers-off-white-red-3.webp"
+  ],
+  "source": "mens-shoes"
+ },
+ {
+  "name": "Sports Sneakers Off White Red",
+  "brand": "Off White",
+  "category": "Poyabzal",
+  "usd": 109.99,
+  "images": [
+   "/uploads/demo/mens-shoes/sports-sneakers-off-white-red-1.webp",
+   "/uploads/demo/mens-shoes/sports-sneakers-off-white-red-2.webp",
+   "/uploads/demo/mens-shoes/sports-sneakers-off-white-red-3.webp"
+  ],
+  "source": "mens-shoes"
+ },
+ {
+  "name": "Blue Women's Handbag",
+  "brand": "Fashionista",
+  "category": "Sumkalar",
+  "usd": 49.99,
+  "images": [
+   "/uploads/demo/womens-bags/blue-women-s-handbag-1.webp",
+   "/uploads/demo/womens-bags/blue-women-s-handbag-2.webp",
+   "/uploads/demo/womens-bags/blue-women-s-handbag-3.webp"
+  ],
+  "source": "womens-bags"
+ },
+ {
+  "name": "Heshe Women's Leather Bag",
+  "brand": "Heshe",
+  "category": "Sumkalar",
+  "usd": 129.99,
+  "images": [
+   "/uploads/demo/womens-bags/heshe-women-s-leather-bag-1.webp",
+   "/uploads/demo/womens-bags/heshe-women-s-leather-bag-2.webp",
+   "/uploads/demo/womens-bags/heshe-women-s-leather-bag-3.webp"
+  ],
+  "source": "womens-bags"
+ },
+ {
+  "name": "Prada Women Bag",
+  "brand": "Prada",
+  "category": "Sumkalar",
+  "usd": 599.99,
+  "images": [
+   "/uploads/demo/womens-bags/prada-women-bag-1.webp",
+   "/uploads/demo/womens-bags/prada-women-bag-2.webp",
+   "/uploads/demo/womens-bags/prada-women-bag-3.webp"
+  ],
+  "source": "womens-bags"
+ },
+ {
+  "name": "White Faux Leather Backpack",
+  "brand": "Urban Chic",
+  "category": "Sumkalar",
+  "usd": 39.99,
+  "images": [
+   "/uploads/demo/womens-bags/white-faux-leather-backpack-1.webp",
+   "/uploads/demo/womens-bags/white-faux-leather-backpack-2.webp",
+   "/uploads/demo/womens-bags/white-faux-leather-backpack-3.webp"
+  ],
+  "source": "womens-bags"
+ },
+ {
+  "name": "Women Handbag Black",
+  "brand": "Elegance Collection",
+  "category": "Sumkalar",
+  "usd": 59.99,
+  "images": [
+   "/uploads/demo/womens-bags/women-handbag-black-1.webp",
+   "/uploads/demo/womens-bags/women-handbag-black-2.webp",
+   "/uploads/demo/womens-bags/women-handbag-black-3.webp"
+  ],
+  "source": "womens-bags"
+ },
+ {
+  "name": "Black Sun Glasses",
+  "brand": "Fashion Shades",
+  "category": "Ko'zoynaklar",
+  "usd": 29.99,
+  "images": [
+   "/uploads/demo/sunglasses/black-sun-glasses-1.webp",
+   "/uploads/demo/sunglasses/black-sun-glasses-2.webp",
+   "/uploads/demo/sunglasses/black-sun-glasses-3.webp"
+  ],
+  "source": "sunglasses"
+ },
+ {
+  "name": "Classic Sun Glasses",
+  "brand": "Fashion Shades",
+  "category": "Ko'zoynaklar",
+  "usd": 24.99,
+  "images": [
+   "/uploads/demo/sunglasses/classic-sun-glasses-1.webp",
+   "/uploads/demo/sunglasses/classic-sun-glasses-2.webp",
+   "/uploads/demo/sunglasses/classic-sun-glasses-3.webp"
+  ],
+  "source": "sunglasses"
+ },
+ {
+  "name": "Green and Black Glasses",
+  "brand": "Fashion Shades",
+  "category": "Ko'zoynaklar",
+  "usd": 34.99,
+  "images": [
+   "/uploads/demo/sunglasses/green-and-black-glasses-1.webp",
+   "/uploads/demo/sunglasses/green-and-black-glasses-2.webp",
+   "/uploads/demo/sunglasses/green-and-black-glasses-3.webp"
+  ],
+  "source": "sunglasses"
+ },
+ {
+  "name": "Party Glasses",
+  "brand": "Fashion Fun",
+  "category": "Ko'zoynaklar",
+  "usd": 19.99,
+  "images": [
+   "/uploads/demo/sunglasses/party-glasses-1.webp",
+   "/uploads/demo/sunglasses/party-glasses-2.webp",
+   "/uploads/demo/sunglasses/party-glasses-3.webp"
+  ],
+  "source": "sunglasses"
+ },
+ {
+  "name": "Sunglasses",
+  "brand": "Fashion Shades",
+  "category": "Ko'zoynaklar",
+  "usd": 22.99,
+  "images": [
+   "/uploads/demo/sunglasses/sunglasses-1.webp",
+   "/uploads/demo/sunglasses/sunglasses-2.webp",
+   "/uploads/demo/sunglasses/sunglasses-3.webp"
+  ],
+  "source": "sunglasses"
+ }
+]

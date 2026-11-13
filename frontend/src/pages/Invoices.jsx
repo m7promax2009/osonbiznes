@@ -100,8 +100,8 @@ export default function Invoices() {
   const handlePrintInvoice = (inv) => {
     sounds.playClick()
     const printWindow = window.open('', '_blank')
-    const formattedTotal = new Intl.NumberFormat('uz-UZ').format(inv.total) + " so'm"
-    const qqsAmount = new Intl.NumberFormat('uz-UZ').format(Math.round(inv.total * 0.12)) + " so'm"
+    const formattedTotal = new Intl.NumberFormat('ru-RU').format(inv.total) + " so'm"
+    const qqsAmount = new Intl.NumberFormat('ru-RU').format(Math.round(inv.total * 0.12)) + " so'm"
     const sellerName = sellerProfile?.business || sellerProfile?.name || 'MCHJ "OsonBiznes Technology"'
     const sellerPhone = sellerProfile?.phone || '+998 90 000 00 00'
 
@@ -169,8 +169,8 @@ export default function Invoices() {
                   <td>${i + 1}</td>
                   <td>${item.name}</td>
                   <td>${item.qty} dona</td>
-                  <td>${new Intl.NumberFormat('uz-UZ').format(item.price)} so'm</td>
-                  <td style="text-align: right; font-weight: bold;">${new Intl.NumberFormat('uz-UZ').format(item.qty * item.price)} so'm</td>
+                  <td>${new Intl.NumberFormat('ru-RU').format(item.price)} so'm</td>
+                  <td style="text-align: right; font-weight: bold;">${new Intl.NumberFormat('ru-RU').format(item.qty * item.price)} so'm</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -206,7 +206,7 @@ export default function Invoices() {
     overdue: "Muddati oʻtgan",
   }
 
-  const formatPrice = (p) => new Intl.NumberFormat('uz-UZ').format(p || 0) + " so'm"
+  const formatPrice = (p) => new Intl.NumberFormat('ru-RU').format(p || 0) + " so'm"
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">

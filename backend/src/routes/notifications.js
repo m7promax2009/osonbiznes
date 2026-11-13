@@ -21,11 +21,11 @@ router.get('/', authenticate, async (req, res) => {
     const [notifications, total, unreadCount] = await Promise.all([
       Notification.find(filter)
         .sort({ createdAt: -1 })
-        .skip(parseInt(offset))
-        .limit(parseInt(limit))
+        .skip(Math.max(0, parseInt(offset) || 0))
+        .limit(Math.min(100, Math.max(1, parseInt(limit) || 20)))
         .lean(),
-      Notification.countDocuments({ userId: req.user.id }),
-      Notification.unreadCount(req.user.id),
+      Notification.countDocuments(filter),
+      Notification.countDocuments({ ...filter, read: false }),
     ])
 
     res.json({
@@ -33,7 +33,7 @@ router.get('/', authenticate, async (req, res) => {
       data: notifications,
       total,
       unreadCount,
-      page: Math.floor(parseInt(offset) / parseInt(limit)) + 1,
+      page: Math.floor((parseInt(offset) || 0) / (parseInt(limit) || 20)) + 1,
     })
   } catch (error) {
     console.error('Notifications GET error:', error)

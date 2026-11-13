@@ -27,6 +27,28 @@ services:
         sync: false            # frontend URL, masalan: https://osonbiznes-web.onrender.com
       - key: MONGOMS_DISABLE_POSTINSTALL
         value: "1"
+      - key: ADMIN_EMAIL
+        sync: false            # birinchi admin (faqat baza bo'sh bo'lsa yaratiladi)
+      - key: ADMIN_PASSWORD
+        sync: false            # kamida 12 belgi
+      - key: PAYMENT_CARD_NUMBER
+        sync: false            # obuna puli tushadigan karta
+      - key: PAYMENT_CARD_HOLDER
+        sync: false
+      - key: PAYMENT_CARD_BANK
+        sync: false
+      - key: AGENT_API_KEY
+        generateValue: true
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "465"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
 
   # 2) Frontend (React static site)
   - type: web

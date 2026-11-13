@@ -1,5 +1,6 @@
 const express = require('express')
 const router = express.Router()
+const { checkPassword } = require('../services/passwordPolicy')
 const User = require('../models/User')
 const Payment = require('../models/Payment')
 const Order = require('../models/Order')
@@ -142,6 +143,13 @@ router.put('/users/:id', async (req, res) => {
     if (phone !== undefined) update.phone = phone
     if (isActive !== undefined) update.isActive = isActive
 
+    if (tariff !== undefined && !['trial', 'start', 'pro', 'business', 'blocked'].includes(tariff)) {
+      return res.status(400).json({ success: false, message: "Noto'g'ri tarif" })
+    }
+    if (isActive !== undefined && typeof isActive !== 'boolean') {
+      return res.status(400).json({ success: false, message: "isActive boolean bo'lishi kerak" })
+    }
+
     if (tariff) {
       update.tariff = tariff
       if (tariff === 'start') {
@@ -177,6 +185,9 @@ router.post('/users', async (req, res) => {
     if (!name || !email || !password) {
       return res.status(400).json({ success: false, message: 'Ism, email va parol majburiy' })
     }
+
+    const pwError = checkPassword(password, { email, name, phone })
+    if (pwError) return res.status(400).json({ success: false, message: pwError })
 
     const existing = await User.findOne({ email: email.toLowerCase() })
     if (existing) {
@@ -254,22 +265,29 @@ router.get('/payments', async (req, res) => {
 // Bu YAGONA ishonchli faollashtirish yo'li (foydalanuvchi o'zi tasdiqlay olmaydi).
 router.put('/payments/:id/approve', async (req, res) => {
   try {
-    const payment = await Payment.findById(req.params.id)
-    if (!payment) return res.status(404).json({ success: false, message: 'Tolov topilmadi' })
-    if (payment.status === 'success') {
-      return res.status(400).json({ success: false, message: 'Tolov allaqachon tasdiqlangan' })
+    // Atomik: faqat 'pending' to'lov tasdiqlanadi (ikki marta bosilsa ikki marta uzaytirilmaydi)
+    const payment = await Payment.findOneAndUpdate(
+      { _id: req.params.id, status: 'pending' },
+      { $set: { status: 'success' } },
+      { new: true }
+    )
+    if (!payment) {
+      return res.status(400).json({ success: false, message: "To'lov topilmadi yoki allaqachon ko'rib chiqilgan" })
     }
-
-    payment.status = 'success'
-    await payment.save()
 
     // Obuna tariflari uchun foydalanuvchini yangilash
     if (payment.type === 'subscription' && payment.tariff) {
       const user = await User.findById(payment.userId)
       if (user) {
+        const days = Number(payment.metadata?.durationDays) || SUBSCRIPTION_DAYS
+        // Shu tarif hali faol bo'lsa — qolgan kunlar ustiga qo'shiladi (yangilashda kun yo'qolmaydi)
+        const now = Date.now()
+        const base = user.tariff === payment.tariff && user.subscriptionEnd && user.subscriptionEnd.getTime() > now
+          ? user.subscriptionEnd.getTime()
+          : now
         user.tariff = payment.tariff
-        user.subscriptionStart = new Date()
-        user.subscriptionEnd = new Date(Date.now() + SUBSCRIPTION_DAYS * 24 * 60 * 60 * 1000)
+        user.subscriptionStart = user.subscriptionStart && base > now ? user.subscriptionStart : new Date()
+        user.subscriptionEnd = new Date(base + days * 24 * 60 * 60 * 1000)
         user.paymentMethod = payment.method
         await user.save()
 
@@ -279,7 +297,7 @@ router.put('/payments/:id/approve', async (req, res) => {
             userId: user._id,
             type: 'payment_success',
             title: "Obuna to'lovingiz tasdiqlandi! 🎉",
-            message: `Sizning ${payment.amount.toLocaleString()} so'mlik (${payment.tariff.toUpperCase()}) to'lovingiz admin tomonidan tasdiqlandi va tarifingiz 30 kunga faollashtirildi.`,
+            message: `Sizning ${payment.amount.toLocaleString()} so'mlik (${payment.tariff.toUpperCase()}) to'lovingiz admin tomonidan tasdiqlandi va tarifingiz ${days} kunga faollashtirildi.`,
             data: { paymentId: payment._id.toString(), tariff: payment.tariff },
             urgent: true,
           })
@@ -297,12 +315,12 @@ router.put('/payments/:id/approve', async (req, res) => {
 // PUT /api/admin/payments/:id/reject - To'lovni rad etish
 router.put('/payments/:id/reject', async (req, res) => {
   try {
-    const payment = await Payment.findByIdAndUpdate(
-      req.params.id,
+    const payment = await Payment.findOneAndUpdate(
+      { _id: req.params.id, status: 'pending' },
       { $set: { status: 'failed' } },
       { new: true }
     )
-    if (!payment) return res.status(404).json({ success: false, message: 'Tolov topilmadi' })
+    if (!payment) return res.status(400).json({ success: false, message: "To'lov topilmadi yoki allaqachon ko'rib chiqilgan" })
 
     try {
       const Notification = require('../models/Notification')

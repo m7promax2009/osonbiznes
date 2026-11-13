@@ -11,6 +11,9 @@ import api, { resolveImageUrl } from '../services/api'
 import LanguageSwitcher from '../components/LanguageSwitcher'
 import SupportModal from '../components/SupportModal'
 import MarketplaceCartModal from '../components/MarketplaceCartModal'
+import ProductCard from '../components/ProductCard'
+import { useCart } from '../hooks/useCart'
+import { useFavorites } from '../hooks/useFavorites'
 import sounds from '../utils/audio'
 import { toast } from '../components/Toast'
 
@@ -22,7 +25,7 @@ const CATEGORY_EMOJIS = {
 }
 
 function formatPrice(p) {
-  return new Intl.NumberFormat('uz-UZ').format(p || 0) + " so'm"
+  return new Intl.NumberFormat('ru-RU').format(p || 0) + " so'm"
 }
 
 export default function OsonBozorShop() {
@@ -37,67 +40,12 @@ export default function OsonBozorShop() {
   const [selectedCategory, setSelectedCategory] = useState('')
   const [showSupport, setShowSupport] = useState(false)
 
-  // Shopping Cart
-  const [cart, setCart] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('osonbozor_cart') || '[]')
-    } catch (_) { return [] }
-  })
+  // Umumiy savat (bozor, do'kon va mahsulot sahifalari bilan bir xil)
+  const { cart, addToCart, updateCartQty, removeFromCart, clearCart } = useCart()
+  const fav = useFavorites()
   const [showCartModal, setShowCartModal] = useState(false)
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('osonbozor_cart', JSON.stringify(cart))
-    } catch (_) {}
-  }, [cart])
-
-  const addToCart = (product, shopData, qty = 1) => {
-    sounds.playCashChing()
-    setCart(prev => {
-      const existing = prev.find(i => (i.productId || i._id) === product._id)
-      if (existing) {
-        return prev.map(i => (i.productId || i._id) === product._id ? { ...i, qty: i.qty + qty } : i)
-      }
-      return [...prev, {
-        productId: product._id,
-        _id: product._id,
-        name: product.name,
-        price: product.price,
-        stock: product.stock,
-        images: product.images,
-        category: product.category,
-        shopId: shopData?._id || shopId,
-        shopName: shopData?.name || shop?.name || "Do'kon",
-        qty,
-      }]
-    })
-    toast.success(`"${product.name}" savatga qo'shildi! 🛒`)
-  }
-
-  const updateCartQty = (productId, delta) => {
-    sounds.playClick()
-    setCart(prev => prev.map(i => {
-      if ((i.productId || i._id) === productId) {
-        const newQty = i.qty + delta
-        return newQty > 0 ? { ...i, qty: newQty } : null
-      }
-      return i
-    }).filter(Boolean))
-  }
-
-  const removeFromCart = (productId) => {
-    sounds.playClick()
-    setCart(prev => prev.filter(i => (i.productId || i._id) !== productId))
-    toast.info("Mahsulot savatdan o'chirildi")
-  }
-
-  const clearCart = () => {
-    setCart([])
-  }
-
   // Product detail modal
-  const [productModal, setProductModal] = useState(null)
-  const [galleryIdx, setGalleryIdx] = useState(0)
 
   // Order modal
   const [orderModal, setOrderModal] = useState({ open: false, product: null })
@@ -124,10 +72,10 @@ export default function OsonBozorShop() {
 
   // Modal ochiq paytida fon scroll bo'lmasligi uchun
   useEffect(() => {
-    const locked = !!productModal || orderModal.open
+    const locked = orderModal.open
     document.body.style.overflow = locked ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
-  }, [productModal, orderModal.open])
+  }, [orderModal.open])
 
   // Marketplace doimo yorug' ko'rinishda bo'ladi (dark mode'da buzilmasligi uchun)
   useEffect(() => {
@@ -322,10 +270,12 @@ export default function OsonBozorShop() {
                     <Phone className="w-4 h-4 shrink-0" /> {shop.phone}
                   </span>
                 )}
+                {shop.rating != null && (
                 <span className="flex items-center gap-1.5">
                   <Star className="w-4 h-4 fill-current text-amber-300" />
-                  <strong className="text-white">{shop.rating?.toFixed(1)}</strong>
+                  <strong className="text-white">{shop.rating.toFixed(1)}</strong>
                 </span>
+                )}
                 <span className="flex items-center gap-1.5">
                   <Package className="w-4 h-4 shrink-0" /> {products.length} ta mahsulot
                 </span>
@@ -421,81 +371,10 @@ export default function OsonBozorShop() {
               {filteredProducts.length} ta mahsulot topildi
               {selectedCategory && ` — "${selectedCategory}" kategoriyasida`}
             </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
-              {filteredProducts.map(product => {
-                const imgs = productImages(product)
-                return (
-                  <div
-                    key={product._id}
-                    className="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl hover:shadow-slate-200/70 hover:-translate-y-0.5 hover:border-emerald-200 transition-all duration-200 group flex flex-col cursor-pointer"
-                    onClick={() => { setProductModal(product); setGalleryIdx(0) }}
-                  >
-                    {/* Image */}
-                    <div className="aspect-[4/3] bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center relative overflow-hidden">
-                      {imgs.length > 0 ? (
-                        <img
-                          src={resolveImageUrl(imgs[0])}
-                          alt={product.name}
-                          loading="lazy"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          onError={(e) => { e.currentTarget.style.display = 'none'; const fb = e.currentTarget.parentElement?.querySelector('.img-fallback'); if (fb) fb.classList.remove('hidden') }}
-                        />
-                      ) : null}
-                      <div className={`img-fallback w-full h-full flex flex-col items-center justify-center gap-1.5 bg-gradient-to-br from-slate-100 to-slate-200 ${imgs.length > 0 ? 'hidden' : ''}`}>
-                        <Package className="w-10 h-10 text-slate-400" />
-                        <span className="text-[10px] text-slate-500">Rasm yo'q</span>
-                      </div>
-                      <span className="absolute top-2 left-2 px-2 py-0.5 bg-white/90 backdrop-blur-sm text-slate-600 text-[10px] rounded-md border border-slate-100 shadow-sm">
-                        {CATEGORY_EMOJIS[product.category] || '📦'} {product.category}
-                      </span>
-                      <span className="absolute top-2 right-2 px-1.5 py-0.5 bg-slate-900/70 backdrop-blur-sm text-white text-[9px] font-medium rounded-md">
-                        {product.stock > 5 ? 'Mavjud' : product.stock > 0 ? 'Kam qoldi' : 'Tugadi'}
-                      </span>
-                    </div>
-
-                    {/* Info */}
-                    <div className="p-3.5 flex flex-col flex-1">
-                      <h3 className="text-sm font-semibold text-slate-900 mt-1 line-clamp-2 leading-snug min-h-[2.5em] group-hover:text-emerald-700 transition-colors">
-                        {product.name}
-                      </h3>
-                      <div className="mt-auto pt-2.5">
-                        <p className="text-lg font-extrabold text-slate-900 tracking-tight">{formatPrice(product.price)}</p>
-                      </div>
-                      {/* Buy & Cart Buttons */}
-                      {product.stock > 0 ? (
-                        <div className="flex items-center gap-1.5 mt-2.5">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              addToCart(product, shop)
-                            }}
-                            className="flex-1 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 border border-emerald-200 shadow-xs"
-                            title="Savatga qo'shish"
-                          >
-                            <ShoppingBag className="w-3.5 h-3.5 text-emerald-600" />
-                            Savatga
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              addToCart(product, shop)
-                              setShowCartModal(true)
-                            }}
-                            className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 shadow-sm shadow-emerald-200"
-                            title="To'g'ridan-to'g'ri sotib olish"
-                          >
-                            Sotib Olish
-                          </button>
-                        </div>
-                      ) : (
-                        <button disabled className="mt-2.5 w-full py-2 bg-slate-100 text-slate-400 rounded-xl text-xs font-medium cursor-not-allowed">
-                          Tugadi
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4">
+              {filteredProducts.map(product => (
+                <ProductCard key={product._id} product={product} onAdd={(p) => addToCart(p, shop)} showShop={false} fav={fav.has(product._id)} onFav={fav.toggle} />
+              ))}
             </div>
           </>
         )}
@@ -517,88 +396,7 @@ export default function OsonBozorShop() {
       </footer>
 
       {/* Product Detail Modal */}
-      {productModal && (() => {
-        const imgs = productImages(productModal)
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setProductModal(null)} />
-            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto z-10">
-              <button onClick={() => setProductModal(null)} aria-label="Yopish" className="absolute top-4 right-4 z-10 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center shadow-md hover:bg-white transition">
-                <X className="w-4 h-4 text-slate-600" />
-              </button>
-              {imgs.length > 0 && (
-                <div className="relative bg-slate-100 aspect-[16/10]">
-                  <img key={galleryIdx} src={resolveImageUrl(imgs[galleryIdx])} alt={productModal.name} className="w-full h-full object-contain" />
-                  {imgs.length > 1 && (
-                    <>
-                      <button onClick={() => setGalleryIdx(i => i <= 0 ? imgs.length - 1 : i - 1)} className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-white/90 rounded-full flex items-center justify-center shadow-md">
-                        <ChevronLeft className="w-5 h-5 text-slate-700" />
-                      </button>
-                      <button onClick={() => setGalleryIdx(i => i >= imgs.length - 1 ? 0 : i + 1)} className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-white/90 rounded-full flex items-center justify-center shadow-md">
-                        <ChevronRight className="w-5 h-5 text-slate-700" />
-                      </button>
-                      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-                        {imgs.map((_, i) => (
-                          <button key={i} onClick={() => setGalleryIdx(i)} className={`w-2 h-2 rounded-full transition ${i === galleryIdx ? 'bg-white shadow-md' : 'bg-white/50'}`} />
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-              <div className="p-6 space-y-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                      <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] rounded-md">
-                        {CATEGORY_EMOJIS[productModal.category] || '📦'} {productModal.category}
-                      </span>
-                      <span className={`px-2 py-0.5 text-[10px] font-medium rounded-md ${productModal.stock > 5 ? 'bg-emerald-50 text-emerald-700' : productModal.stock > 0 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>
-                        {productModal.stock > 5 ? 'Mavjud' : productModal.stock > 0 ? `${productModal.stock} ta qoldi` : 'Tugadi'}
-                      </span>
-                    </div>
-                    <h3 className="text-xl font-bold text-slate-900">{productModal.name}</h3>
-                    {productModal.sku && <p className="text-xs text-slate-400 font-mono mt-1">SKU: {productModal.sku}</p>}
-                  </div>
-                  <p className="text-2xl font-extrabold text-slate-900 shrink-0">{formatPrice(productModal.price)}</p>
-                </div>
-                {productModal.description && (
-                  <p className="text-sm text-slate-600 leading-relaxed">{productModal.description}</p>
-                )}
-                {imgs.length > 1 && (
-                  <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                    {imgs.map((url, i) => (
-                      <button key={i} onClick={() => setGalleryIdx(i)} className={`w-16 h-16 rounded-lg overflow-hidden border-2 shrink-0 transition ${i === galleryIdx ? 'border-emerald-500' : 'border-transparent hover:border-slate-300'}`}>
-                        <img src={resolveImageUrl(url)} alt="" loading="lazy" className="w-full h-full object-cover" />
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {productModal.stock > 0 ? (
-                  <button
-                    onClick={() => {
-                      setProductModal(null)
-                      setTimeout(() => {
-                        setOrderModal({ open: true, product: productModal })
-                        setOrderForm({ customer: '', phone: '', address: '', deliveryMethod: 'pickup' })
-                        setOrderSuccess(null)
-                        setOrderError('')
-                      }, 200)
-                    }}
-                    className="w-full py-3.5 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-200/70"
-                  >
-                    <ShoppingBag className="w-5 h-5" /> Sotib olish — {formatPrice(productModal.price)}
-                  </button>
-                ) : (
-                  <button disabled className="w-full py-3.5 bg-slate-100 text-slate-500 rounded-xl text-sm font-bold cursor-not-allowed">
-                    Mahsulot tugagan
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )
-      })()}
+
 
       {/* Order Modal */}
       {orderModal.open && (

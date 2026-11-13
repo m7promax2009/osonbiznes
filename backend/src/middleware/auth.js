@@ -22,6 +22,11 @@ async function authenticate(req, res, next) {
       return res.status(403).json({ success: false, message: 'Hisobingiz bloklangan' })
     }
 
+    // Parol almashtirilgandan oldingi tokenlar bekor (1 soniya zaxira: iat soniyalarda)
+    if (user.passwordChangedAt && decoded.iat * 1000 < user.passwordChangedAt.getTime() - 1000) {
+      return res.status(401).json({ success: false, message: 'Parol o\'zgartirilgan. Qayta kiring.' })
+    }
+
     // Foydalanuvchi session ga qo'shamiz
     req.user = {
       id: user._id,
@@ -33,6 +38,7 @@ async function authenticate(req, res, next) {
       tariff: user.tariff,
       tariffStatus: user.tariffStatus,
       trialDaysLeft: user.trialDaysLeft,
+      emailVerified: user.emailVerified !== false,
     }
 
     next()

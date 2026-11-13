@@ -7,8 +7,26 @@ const Customer = require('../models/Customer')
 const Product = require('../models/Product')
 const { authenticate, requireActiveSubscription } = require('../middleware/auth')
 const { validateItems, escapeRegex, safeSearchRegex } = require('../utils/sanitize')
+const { reserveStock, releaseStock, StockError } = require('../services/stock')
 
 const ORDER_STATUSES = ['pending', 'processing', 'completed', 'cancelled']
+
+// Buyurtma bekor/o'chirilganda (sign=-1) yoki qayta tiklanganda (sign=+1)
+// do'kon tushumi va nasiya qarzini moslashtiradi — aks holda hisobotlar va qarz daftari yolg'on ko'rsatadi.
+async function applyOrderEffects(userId, order, sign) {
+  await User.updateOne({ _id: userId }, { $inc: { totalRevenue: sign * order.total } })
+  if (order.paymentMethod === 'nasiya') {
+    const customer = await Customer.findOne({
+      userId,
+      name: { $regex: `^${escapeRegex(order.customer)}$`, $options: 'i' },
+    })
+    if (customer) {
+      customer.debt = Math.max(0, (customer.debt || 0) + sign * order.total)
+      if (customer.debt === 0) customer.debtDueDate = null
+      await customer.save()
+    }
+  }
+}
 const PAYMENT_STATUSES = ['unpaid', 'paid', 'refunded', 'partially_paid']
 
 // GET /api/orders - Buyurtmalar
@@ -95,15 +113,34 @@ router.post('/', authenticate, requireActiveSubscription, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Mijoz majburiy' })
     }
     // Item'larni server tomonida tekshirish (qty butun>=1, price>=0)
-    const { items, error } = validateItems(req.body.items)
+    const { items: rawItems, error } = validateItems(req.body.items)
     if (error) return res.status(400).json({ success: false, message: error })
+
+    const PAYMENT_METHODS = ['cash', 'click', 'payme', 'card', 'transfer', 'nasiya', '']
+    if (paymentMethod && !PAYMENT_METHODS.includes(paymentMethod)) {
+      return res.status(400).json({ success: false, message: "Noto'g'ri to'lov usuli" })
+    }
+    if (source && !['manual', 'telegram', 'website', 'pos'].includes(source)) {
+      return res.status(400).json({ success: false, message: "Noto'g'ri manba" })
+    }
+
+    // Avval qoldiqni atomik band qilamiz: yetmasa buyurtma YARATILMAYDI (oversell yo'q)
+    let items
+    try {
+      items = await reserveStock(req.user.id, rawItems)
+    } catch (err) {
+      if (err instanceof StockError) return res.status(400).json({ success: false, message: err.message })
+      throw err
+    }
 
     // Hisob-kitob server tomonida (chegirma bilan)
     const subtotal = items.reduce((sum, item) => sum + item.price * item.qty, 0)
     const discount = Math.max(0, Number(req.body.discount) || 0)
     const total = Math.max(0, subtotal - discount)
 
-    const order = await Order.createOrder({
+    let order
+    try {
+      order = await Order.createOrder({
       userId: req.user.id,
       customer,
       phone: phone || '',
@@ -115,6 +152,10 @@ router.post('/', authenticate, requireActiveSubscription, async (req, res) => {
       source: source || 'manual',
       notes: notes || '',
     })
+    } catch (err) {
+      await releaseStock(req.user.id, items)
+      throw err
+    }
 
     // Update customer stats & Nasiya CRM
     let customerDoc = await Customer.findOne({
@@ -163,21 +204,15 @@ router.post('/', authenticate, requireActiveSubscription, async (req, res) => {
           tags: isNasiya ? ['Nasiya'] : ['Yangi'],
         })
         await User.findByIdAndUpdate(req.user.id, { $inc: { totalCustomers: 1 } })
-      } catch (_) {}
+      } catch (err) {
+        console.error('Auto-customer create error:', err.message)
+      }
     }
 
     // Update user stats
     await User.findByIdAndUpdate(req.user.id, {
       $inc: { totalOrders: 1, totalRevenue: total },
     })
-
-    // Update product stock — stock >= qty sharti manfiy qoldiqning oldini oladi
-    for (const item of items) {
-      await Product.updateOne(
-        { userId: req.user.id, name: item.name, stock: { $gte: item.qty } },
-        { $inc: { stock: -item.qty } }
-      )
-    }
 
     // Send notification about new order
     try {
@@ -220,21 +255,18 @@ router.put('/:id/status', authenticate, async (req, res) => {
     const oldStatus = currentOrder.status
     const newStatus = status || oldStatus
 
-    // Stok boshqaruvi: bekor qilinsa omborga qaytarish, qayta faollashsa yana kamaytirish
+    // Stok boshqaruvi: bekor qilinsa omborga qaytarish, qayta faollashsa yana band qilish
     if (oldStatus !== 'cancelled' && newStatus === 'cancelled') {
-      for (const item of (currentOrder.items || [])) {
-        await Product.updateOne(
-          { userId: req.user.id, name: item.name },
-          { $inc: { stock: item.qty } }
-        )
-      }
+      await releaseStock(req.user.id, currentOrder.items)
+      await applyOrderEffects(req.user.id, currentOrder, -1)
     } else if (oldStatus === 'cancelled' && newStatus !== 'cancelled') {
-      for (const item of (currentOrder.items || [])) {
-        await Product.updateOne(
-          { userId: req.user.id, name: item.name, stock: { $gte: item.qty } },
-          { $inc: { stock: -item.qty } }
-        )
+      try {
+        await reserveStock(req.user.id, currentOrder.items.map(i => i.toObject()))
+      } catch (err) {
+        if (err instanceof StockError) return res.status(400).json({ success: false, message: err.message })
+        throw err
       }
+      await applyOrderEffects(req.user.id, currentOrder, +1)
     }
 
     const update = {}
@@ -399,16 +431,12 @@ router.delete('/:id', authenticate, async (req, res) => {
 
     // Agar buyurtma bekor qilinmagan bo'lsa, ombordagi qoldiqni tiklaymiz
     if (order.status !== 'cancelled') {
-      for (const item of (order.items || [])) {
-        await Product.updateOne(
-          { userId: req.user.id, name: item.name },
-          { $inc: { stock: item.qty } }
-        )
-      }
+      await releaseStock(req.user.id, order.items)
+      await applyOrderEffects(req.user.id, order, -1)
     }
 
     // Faqat haqiqatan o'chirilganda hisobni kamaytiramiz (double-delete drift oldini olish)
-    await User.findByIdAndUpdate(req.user.id, { $inc: { totalOrders: -1, totalRevenue: -order.total } })
+    await User.findByIdAndUpdate(req.user.id, { $inc: { totalOrders: -1 } })
     
     res.json({ success: true, message: 'Buyurtma ochirildi' })
   } catch (error) {

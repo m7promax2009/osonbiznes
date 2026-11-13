@@ -6,6 +6,17 @@ const { authenticate, requireActiveSubscription } = require('../middleware/auth'
 const { enforceLimit } = require('../middleware/limits')
 const { safeSearchRegex } = require('../utils/sanitize')
 
+// Raqamli maydonlar: manfiy yoki NaN bo'lmasin (aks holda CastError -> 500)
+function checkNumbers(fields) {
+  for (const [key, val] of Object.entries(fields)) {
+    if (val === undefined || val === '' || val === null) continue
+    const n = Number(val)
+    if (!Number.isFinite(n) || n < 0) return `${key} manfiy bo'lmagan son bo'lishi kerak`
+    if (key === 'stock' && !Number.isInteger(n)) return 'Qoldiq butun son bo\'lishi kerak'
+  }
+  return null
+}
+
 // GET /api/products - Barcha mahsulotlar
 router.get('/', authenticate, async (req, res) => {
   try {
@@ -37,7 +48,7 @@ router.get('/', authenticate, async (req, res) => {
 // GET /api/products/categories - Kategoriyalar
 router.get('/categories', authenticate, async (req, res) => {
   try {
-    const categories = await Product.distinct('category', { userId: req.user.id })
+    const categories = await Product.distinct('category', { userId: req.user.id, isActive: true })
     res.json({ success: true, data: categories })
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server xatoligi' })
@@ -49,8 +60,8 @@ router.get('/stats', authenticate, async (req, res) => {
   try {
     const [total, lowStock, outOfStock] = await Promise.all([
       Product.countDocuments({ userId: req.user.id, isActive: true }),
-      Product.countDocuments({ userId: req.user.id, status: 'low' }),
-      Product.countDocuments({ userId: req.user.id, status: 'out' }),
+      Product.countDocuments({ userId: req.user.id, isActive: true, stock: { $gt: 0, $lt: 5 } }),
+      Product.countDocuments({ userId: req.user.id, isActive: true, stock: { $lte: 0 } }),
     ])
 
     res.json({
@@ -80,9 +91,11 @@ router.post('/', authenticate, requireActiveSubscription, enforceLimit('products
   try {
     const { name, category, price, cost, stock, sku, description, images } = req.body
 
-    if (!name || !price) {
+    if (!name || price === undefined || price === '') {
       return res.status(400).json({ success: false, message: 'Nomi va narxi majburiy' })
     }
+    const numErr = checkNumbers({ price, cost, stock })
+    if (numErr) return res.status(400).json({ success: false, message: numErr })
 
     const productData = {
       userId: req.user.id,
@@ -124,7 +137,13 @@ router.put('/:id', authenticate, async (req, res) => {
     if (category !== undefined) update.category = category
     if (price !== undefined) update.price = Number(price)
     if (cost !== undefined) update.cost = Number(cost)
-    if (stock !== undefined) update.stock = Number(stock)
+    const numErr = checkNumbers({ price, cost, stock })
+    if (numErr) return res.status(400).json({ success: false, message: numErr })
+    if (stock !== undefined) {
+      update.stock = Number(stock)
+      // findOneAndUpdate pre('save') ni chaqirmaydi — statusni shu yerda hisoblaymiz
+      update.status = update.stock <= 0 ? 'out' : update.stock < 5 ? 'low' : 'active'
+    }
     if (sku !== undefined) update.sku = sku
     if (description !== undefined) update.description = description
     if (images !== undefined) {

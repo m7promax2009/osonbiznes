@@ -3,6 +3,7 @@ const mongoose = require('mongoose')
 let connected = false
 let usingMemoryServer = false
 let mongoServer = null
+const IS_PROD = process.env.NODE_ENV === 'production'
 
 async function connectDB() {
   if (connected && mongoose.connection.readyState === 1) return
@@ -21,12 +22,22 @@ async function connectDB() {
       })
       connected = true
       console.log(`✅ MongoDB Atlas connected: ${conn.connection.host}`)
-      await seedDemoData()
+      // Demo ma'lumot (ma'lum parolli admin bilan) faqat dev'da yoki aniq ruxsat berilsa
+      if (!IS_PROD || process.env.SEED_DEMO === 'true') {
+        await seedDemoData()
+        // Rasmli demo do'konlar haqiqiy bazaga faqat aniq ruxsat bilan tushadi
+        if (process.env.SEED_DEMO === 'true') await require('./demoMarketplace').seedMarketplaceDemo()
+      }
+      else await ensureAdminFromEnv()
       return conn
     } catch (err) {
       console.log(`⚠️ Atlas unavailable: ${err.message}`)
+      // Productionda xotiradagi bazaga JIM o'tish ma'lumot yo'qolishiga olib keladi — fail-closed
+      if (IS_PROD) throw err
       console.log('🔄 Falling back to MongoDB Memory Server...')
     }
+  } else if (IS_PROD) {
+    throw new Error('MONGODB_URI production uchun majburiy')
   }
 
   // Fallback to MongoDB Memory Server (no external server needed!)
@@ -52,6 +63,7 @@ async function connectDB() {
 
     // Auto-seed demo data
     await seedDemoData()
+    await require('./demoMarketplace').seedMarketplaceDemo()
     return mongoose.connection
   } catch (memErr) {
     console.error('❌ Memory Server also failed:', memErr.message)
@@ -221,14 +233,9 @@ async function seedDemoData() {
 async function ensureMarketplaceProfiles() {
   const ShopProfile = require('../models/ShopProfile')
   const User = require('../models/User')
+  const Product = require('../models/Product')
 
   for (const email of ['demo@osonbiznes.uz', 'bobur@osonbiznes.uz']) {
-    const existingProfile = await ShopProfile.findOne({}).populate({
-      path: 'userId',
-      match: { email },
-    }).then(() => null).catch(() => null)
-
-    // Find user directly
     const user = await User.findOne({ email })
     if (!user) continue
 
@@ -306,6 +313,26 @@ async function ensureBoburShop() {
   })
 
   console.log(`  ✅ Bobur Mobile Store created with ${products2.length} products`)
+}
+
+// Production: admin faqat env orqali (ADMIN_EMAIL + ADMIN_PASSWORD), parol hech qachon logga chiqmaydi
+async function ensureAdminFromEnv() {
+  const User = require('../models/User')
+  const { ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NAME } = process.env
+  if (await User.exists({ role: 'admin' })) return
+  if (!ADMIN_EMAIL || !ADMIN_PASSWORD || ADMIN_PASSWORD.length < 12) {
+    console.warn('⚠️ Admin yo\'q: ADMIN_EMAIL va ADMIN_PASSWORD (kamida 12 belgi) env orqali bering')
+    return
+  }
+  await User.create({
+    name: ADMIN_NAME || 'OsonBiznes Admin',
+    email: ADMIN_EMAIL.toLowerCase(),
+    password: ADMIN_PASSWORD,
+    role: 'admin',
+    tariff: 'business',
+    subscriptionEnd: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000),
+  })
+  console.log(`✅ Admin yaratildi: ${ADMIN_EMAIL}`)
 }
 
 function isConnected() {

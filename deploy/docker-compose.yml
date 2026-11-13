@@ -41,6 +41,15 @@ services:
       JWT_EXPIRES_IN: 30d
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       FRONTEND_URL: ${FRONTEND_URL:-https://osonbiznes.uz}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      # Birinchi admin (baza bo'sh bo'lsa yaratiladi). Parol kamida 12 belgi.
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?ADMIN_EMAIL majburiy}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD majburiy}
+      # Obuna to'lovi qabul qilinadigan karta
+      PAYMENT_CARD_NUMBER: ${PAYMENT_CARD_NUMBER:-}
+      PAYMENT_CARD_HOLDER: ${PAYMENT_CARD_HOLDER:-}
+      PAYMENT_CARD_BANK: ${PAYMENT_CARD_BANK:-}
+      AGENT_API_KEY: ${AGENT_API_KEY:-}
     expose:
       - "5000"
 

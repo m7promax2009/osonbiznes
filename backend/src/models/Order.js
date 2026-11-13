@@ -28,6 +28,7 @@ const orderSchema = new mongoose.Schema({
     default: '',
   },
   items: [{
+    productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', default: null },
     name: { type: String, required: true },
     qty: { type: Number, required: true, min: 1 },
     price: { type: Number, required: true, min: 0 },
@@ -58,7 +59,7 @@ const orderSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['cash', 'click', 'payme', 'card', 'transfer', ''],
+    enum: ['cash', 'click', 'payme', 'card', 'transfer', 'nasiya', ''],
     default: '',
   },
   source: {
@@ -75,6 +76,11 @@ const orderSchema = new mongoose.Schema({
     type: String,
     trim: true,
     default: '',
+  },
+  // Mijoz xaritada belgilagan nuqta (yetkazish uchun) — kuryer aynan shu joyga boradi
+  location: {
+    lat: { type: Number },
+    lng: { type: Number },
   },
   deliveryMethod: {
     type: String,

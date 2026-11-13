@@ -20,7 +20,6 @@ const userSchema = new mongoose.Schema({
   password: {
     type: String,
     required: [true, 'Parol majburiy'],
-    minlength: [6, 'Parol kamida 6 belgi'],
     select: false,
   },
   role: {
@@ -70,6 +69,10 @@ const userSchema = new mongoose.Schema({
   totalProducts: { type: Number, default: 0 },
   lastLogin: Date,
   isActive: { type: Boolean, default: true },
+  // Yangi ro'yxatdan o'tganlarda false; eski hujjatlarda maydon yo'q => tasdiqlangan deb hisoblanadi ($ne: false)
+  emailVerified: { type: Boolean },
+  // Shu vaqtdan oldin berilgan JWT'lar yaroqsiz (parol tiklanganda eski sessiyalar o'chadi)
+  passwordChangedAt: Date,
 }, {
   timestamps: true,
   toJSON: { virtuals: true },

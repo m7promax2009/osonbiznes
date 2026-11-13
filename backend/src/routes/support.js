@@ -2,14 +2,37 @@ const express = require('express')
 const router = express.Router()
 const Notification = require('../models/Notification')
 const User = require('../models/User')
+const { rateLimit } = require('../middleware/rateLimit')
+
+// Ochiq endpoint — admin bildirishnomalarini spam qilishdan himoya
+const crypto = require('crypto')
+const publicLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 5, message: "Juda ko'p murojaat. Birozdan keyin urinib ko'ring." })
+// AI sotuv agenti barcha mijozlar nomidan bitta IP'dan yozadi — unga alohida (kattaroq) limit
+const agentLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 120, message: "Agent limiti tugadi." })
+
+function isAgent(req) {
+  const expected = process.env.AGENT_API_KEY
+  const given = req.get('x-agent-key')
+  if (!expected || expected.length < 24 || !given) return false
+  const a = Buffer.from(given)
+  const b = Buffer.from(expected)
+  return a.length === b.length && crypto.timingSafeEqual(a, b)
+}
+
+function supportLimiter(req, res, next) {
+  return isAgent(req) ? agentLimiter(req, res, next) : publicLimiter(req, res, next)
+}
 
 // POST /api/support - Send support message to admin
-router.post('/', async (req, res) => {
+router.post('/', supportLimiter, async (req, res) => {
   try {
     const { subject, message } = req.body
 
-    if (!subject || !message) {
+    if (!subject || !message || typeof subject !== 'string' || typeof message !== 'string') {
       return res.status(400).json({ success: false, message: 'Mavzu va xabar matni majburiy' })
+    }
+    if (subject.length > 150 || message.length > 2000) {
+      return res.status(400).json({ success: false, message: 'Mavzu (150) yoki xabar (2000) juda uzun' })
     }
 
     // Extract user info if authenticated
@@ -40,9 +63,9 @@ router.post('/', async (req, res) => {
       await Notification.send({
         userId: adminId,
         type: 'admin_message',
-        title: `Yordam: ${subject}`,
-        message: `${userName}${userEmail ? ` (${userEmail})` : ''}: ${message}`,
-        data: { subject, senderId: senderId?.toString() },
+        title: `Yordam: ${subject}`.slice(0, 200),
+        message: `${userName}${userEmail ? ` (${userEmail})` : ''}: ${message}`.slice(0, 500),
+        data: { subject, fullMessage: message, senderId: senderId?.toString() },
         urgent: true,
       })
     }

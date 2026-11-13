@@ -29,7 +29,7 @@ export default function BarcodeModal({ product, onClose }) {
         <body>
           <div class="tag">
             <div class="name">${product.name}</div>
-            <div class="price">${new Intl.NumberFormat('uz-UZ').format(product.price || 0)} so'm</div>
+            <div class="price">${new Intl.NumberFormat('ru-RU').format(product.price || 0)} so'm</div>
             <svg viewBox="0 0 100 40" width="160" height="60">
               <rect x="0" y="0" width="100" height="40" fill="#fff"/>
               <rect x="5" y="5" width="3" height="30" fill="#000"/>
@@ -59,7 +59,7 @@ export default function BarcodeModal({ product, onClose }) {
   }
 
   const sku = product.sku || product.barcode || '871930029101'
-  const formattedPrice = new Intl.NumberFormat('uz-UZ').format(product.price || 0) + " so'm"
+  const formattedPrice = new Intl.NumberFormat('ru-RU').format(product.price || 0) + " so'm"
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">

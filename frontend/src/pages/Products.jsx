@@ -181,7 +181,7 @@ export default function Products() {
     }
   }
 
-  const formatPrice = (p) => new Intl.NumberFormat('uz-UZ').format(p || 0) + " so'm"
+  const formatPrice = (p) => new Intl.NumberFormat('ru-RU').format(p || 0) + " so'm"
 
   const calcMargin = (price, cost) => {
     if (!price || !cost || price <= 0) return 0

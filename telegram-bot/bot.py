@@ -5,6 +5,7 @@ OsonBiznes Telegram Bot (Python) - Multi-Store Edition
 - Each shop has its own catalog
 - Customers can switch between shops freely
 """
+import asyncio
 
 import os
 import logging
@@ -37,7 +38,7 @@ product_cache = {}
 def api_get(endpoint, timeout=8):
     """Make GET request to API with error handling"""
     try:
-        resp = requests.get(f"{API_URL}{endpoint}", timeout=timeout, verify=False)
+        resp = requests.get(f"{API_URL}{endpoint}", timeout=timeout)
         if resp.ok:
             return resp.json()
         logger.warning(f"API GET {endpoint} returned {resp.status_code}")
@@ -52,8 +53,13 @@ def api_get(endpoint, timeout=8):
 def api_post(endpoint, data, timeout=8):
     """Make POST request to API with error handling"""
     try:
-        resp = requests.post(f"{API_URL}{endpoint}", json=data, timeout=timeout, verify=False)
-        return resp.ok, resp.json() if resp.ok else None
+        resp = requests.post(f"{API_URL}{endpoint}", json=data, timeout=timeout)
+        try:
+            body = resp.json()
+        except ValueError:
+            body = None
+        # Xato bo'lsa ham server xabarini qaytaramiz (masalan "qoldiq yetarli emas")
+        return resp.ok, body
     except requests.exceptions.Timeout:
         logger.warning(f"API POST {endpoint} timed out")
     except Exception as e:
@@ -602,21 +608,33 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         price = p.get("price", 0)
                         break
 
-        # Send order via public API (now with productId, address + delivery method)
-        items = [{"name": product_name, "qty": 1, "price": price}]
+        if not shop_id or shop_id == "None":
+            await query.edit_message_text("⚠️ Do'kon aniqlanmadi. /start bosib, do'konni qaytadan tanlang.")
+            return
+
+        # Narx serverda hisoblanadi — biz faqat mahsulot va miqdorni yuboramiz
+        items = [{"name": product_name, "qty": 1}]
         if product_id:
             items[0]["productId"] = product_id  # For precise stock deduction
         order_data = {
             "customer": name,
             "phone": phone,
             "items": items,
-            "total": price,
             "source": "telegram",
             "ownerId": shop_id,
             "address": address,
             "deliveryMethod": delivery_method,
         }
-        ok, result = api_post("/telegram/order", order_data, timeout=10)
+        # Sinxron HTTP so'rovni alohida thread'da — bot event loop'i bloklanmaydi
+        ok, result = await asyncio.to_thread(api_post, "/telegram/order", order_data, 10)
+        if not ok:
+            reason = (result or {}).get("message") or "Server bilan bog'lanib bo'lmadi"
+            await query.edit_message_text(f"❌ Buyurtma qabul qilinmadi: {reason}\n\nQaytadan urinib ko'ring: /start")
+            return
+        server_total = ((result or {}).get("data") or {}).get("total")
+        if server_total is not None:
+            price = server_total
+        order_no = ((result or {}).get("data") or {}).get("orderNumber", "")
 
         delivery_text = ""
         if delivery_method == "pickup":
@@ -625,14 +643,13 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             delivery_text = f"🚚 Yetkazib berish\n📍 {address}" if address else "🚚 Yetkazib berish"
 
         msg = (
-            f"✅ Buyurtma qabul qilindi! 🎉\n\n"
+            f"✅ Buyurtma qabul qilindi! 🎉 {order_no}\n\n"
             f"📦 {product_name}\n"
             f"💰 {format_price(price) if price else 'Narx kelishiladi'}\n"
             f"👤 {name}\n"
             f"📞 {phone}\n"
             f"{delivery_text}\n\n"
-            f"Do'kon egasi buyurtmani qabul qildi.\n"
-            f"Holatni dashboard orqali kuzatishingiz mumkin.\n"
+            f"Do'kon egasi tez orada siz bilan bog'lanadi.\n"
             f"Rahmat! 🙏"
         )
         await query.edit_message_text(msg)

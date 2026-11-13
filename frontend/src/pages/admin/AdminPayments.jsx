@@ -59,7 +59,7 @@ export default function AdminPayments() {
     }
   }
 
-  const formatPrice = (p) => new Intl.NumberFormat('uz-UZ').format(p || 0) + " so'm"
+  const formatPrice = (p) => new Intl.NumberFormat('ru-RU').format(p || 0) + " so'm"
   const formatDate = (date) => {
     if (!date) return '-'
     return new Date(date).toLocaleDateString('uz-UZ')
@@ -130,7 +130,18 @@ export default function AdminPayments() {
                         {payment.tariff || '-'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-slate-600 uppercase">{payment.method}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">
+                      <span className="uppercase">{payment.method === 'transfer' ? "Kartaga o'tkazma" : payment.method}</span>
+                      {payment.metadata?.payerCardLast4 && (
+                        <div className="text-xs font-mono text-slate-500">karta *{payment.metadata.payerCardLast4}</div>
+                      )}
+                      {payment.transactionId && (
+                        <div className="text-xs font-mono text-slate-400">{payment.transactionId}</div>
+                      )}
+                      {payment.metadata?.billingCycle === 'yearly' && (
+                        <div className="text-[10px] font-bold text-emerald-600">1 yillik</div>
+                      )}
+                    </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium ${cfg.bg} ${cfg.color}`}>
                         <Icon className="w-3.5 h-3.5" />

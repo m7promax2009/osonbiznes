@@ -16,11 +16,14 @@ i18n
       en: { translation: en },
     },
     fallbackLng: 'uz',
+    supportedLngs: ['uz', 'ru', 'en'],
     interpolation: {
       escapeValue: false,
     },
+    // Sahifalar matni asosan o'zbekcha — brauzer tilini avtomatik olish aralash interfeys berardi.
+    // Standart: o'zbek; foydalanuvchi LanguageSwitcher orqali tanlasa, localStorage'da saqlanadi.
     detection: {
-      order: ['localStorage', 'navigator'],
+      order: ['localStorage'],
       caches: ['localStorage'],
       lookupLocalStorage: 'osonbiznes_lang',
     },

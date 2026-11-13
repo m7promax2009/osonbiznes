@@ -1,9 +1,10 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import './i18n'
 import Layout from './components/Layout'
 import AdminLayout from './components/AdminLayout'
 import Login from './pages/Login'
+import Landing from './pages/Landing'
 import { Toaster } from './components/Toast'
 
 // Lazy-load page components for code splitting (smaller initial bundle)
@@ -18,11 +19,21 @@ const Subscription = lazy(() => import('./pages/Subscription'))
 const OsonBozor = lazy(() => import('./pages/OsonBozor'))
 const OsonBozorShop = lazy(() => import('./pages/OsonBozorShop'))
 const MarketplaceSettings = lazy(() => import('./pages/MarketplaceSettings'))
+const OsonBozorProduct = lazy(() => import('./pages/OsonBozorProduct'))
+const Feature = lazy(() => import('./pages/Feature'))
+const HowItWorks = lazy(() => import('./pages/HowItWorks'))
+const Pricing = lazy(() => import('./pages/Pricing'))
 // Admin pages
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'))
 const AdminSubscriptions = lazy(() => import('./pages/admin/AdminSubscriptions'))
 const AdminPayments = lazy(() => import('./pages/admin/AdminPayments'))
+
+// Mehmon uchun: "/" — landing, boshqa ichki sahifalar — login
+function PublicHome() {
+  const { pathname } = useLocation()
+  return pathname === '/' ? <Landing /> : <Navigate to="/login" replace />
+}
 
 function PageLoader() {
   return (
@@ -98,9 +109,9 @@ export default function App() {
         {/* Shop Owner routes */}
         <Route
           path="/"
-          element={user ? <Layout user={user} onLogout={handleLogout} /> : <Navigate to="/login" replace />}
+          element={user ? <Layout user={user} onLogout={handleLogout} /> : <PublicHome />}
         >
-          <Route index element={<Dashboard />} />
+          <Route index element={user ? <Dashboard /> : null} />
           <Route path="products" element={<Products />} />
           <Route path="orders" element={<Orders />} />
           <Route path="customers" element={<Customers />} />
@@ -133,6 +144,11 @@ export default function App() {
         {/* Public Marketplace routes - OsonBozor */}
         <Route path="/marketplace" element={<OsonBozor />} />
         <Route path="/marketplace/shop/:shopId" element={<OsonBozorShop />} />
+        <Route path="/marketplace/product/:id" element={<OsonBozorProduct />} />
+        <Route path="/imkoniyatlar/:slug" element={<Feature />} />
+        <Route path="/qanday-ishlaydi" element={<HowItWorks />} />
+        <Route path="/nasiya" element={<Feature slug="nasiya" />} />
+        <Route path="/narxlar" element={<Pricing />} />
 
         <Route path="*" element={<Navigate to={user ? (user.role === 'admin' ? '/admin' : '/') : '/login'} replace />} />
       </Routes>

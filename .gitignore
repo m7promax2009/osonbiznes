@@ -34,3 +34,6 @@ docker-compose.override.yml
 # Uploaded files (foydalanuvchi yuklagan rasmlar repo'ga tushmasin)
 backend/uploads/*
 !backend/uploads/.gitkeep
+__pycache__/
+*.pyc
+.playwright-mcp/

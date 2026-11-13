@@ -109,7 +109,7 @@ export default function Dashboard() {
     }
   }
 
-  const formatPrice = (p) => new Intl.NumberFormat('uz-UZ').format(p || 0) + " so'm"
+  const formatPrice = (p) => new Intl.NumberFormat('ru-RU').format(p || 0) + " so'm"
 
   const statCards = [
     {
@@ -243,7 +243,7 @@ export default function Dashboard() {
       </div>
 
       {/* 4 Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 stagger">
         {statCards.map((stat, idx) => {
           const Icon = stat.icon
           return (
@@ -340,7 +340,7 @@ export default function Dashboard() {
                       fontSize: '12px',
                     }}
                     formatter={(val, name) => [
-                      name === 'tushum' ? `${new Intl.NumberFormat('uz-UZ').format(val)} so'm` : `${val} ta`,
+                      name === 'tushum' ? `${new Intl.NumberFormat('ru-RU').format(val)} so'm` : `${val} ta`,
                       name === 'tushum' ? 'Tushum' : 'Buyurtmalar',
                     ]}
                   />

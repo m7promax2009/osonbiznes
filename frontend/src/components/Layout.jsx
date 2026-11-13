@@ -20,6 +20,7 @@ import Logo from './Logo'
 import LanguageSwitcher from './LanguageSwitcher'
 import NotificationsDropdown from './NotificationsDropdown'
 import AIAdvisor from './AIAdvisor'
+import EmailVerifyBanner from './EmailVerifyBanner'
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', key: 'dashboard', end: true },
@@ -218,12 +219,14 @@ export default function Layout({ user, onLogout }) {
 
         {/* Page content */}
         <main className="flex-1 p-4 lg:p-8 overflow-auto">
+          <EmailVerifyBanner user={user} />
           <Outlet />
         </main>
       </div>
 
       {/* Smart AI Business Advisor Floating Assistant */}
-      <AIAdvisor />
+      {/* POS'da suzuvchi tugma "To'lovni yakunlash" ni to'sadi */}
+      {!location.pathname.startsWith('/pos') && <AIAdvisor />}
     </div>
   )
 }

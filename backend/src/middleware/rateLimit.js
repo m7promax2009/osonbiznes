@@ -1,6 +1,7 @@
 // Oddiy in-memory rate limiter (tashqi paketsiz).
 // Eslatma: bir nechta server instansiyasi bo'lsa, Redis asosidagi limiter tavsiya etiladi.
-function rateLimit({ windowMs = 60000, max = 60, message = "Juda ko'p so'rov yuborildi. Birozdan keyin urinib ko'ring." } = {}) {
+// onlySuccess: faqat muvaffaqiyatli (status < 400) javoblar sanaladi — masalan, ochilgan akkauntlar soni
+function rateLimit({ windowMs = 60000, max = 60, message = "Juda ko'p so'rov yuborildi. Birozdan keyin urinib ko'ring.", onlySuccess = false } = {}) {
   const hits = new Map() // key -> { count, resetAt }
 
   // Eskirgan yozuvlarni davriy tozalash (xotira sizib ketmasligi uchun)
@@ -20,6 +21,16 @@ function rateLimit({ windowMs = 60000, max = 60, message = "Juda ko'p so'rov yub
     if (!rec || now > rec.resetAt) {
       rec = { count: 0, resetAt: now + windowMs }
       hits.set(key, rec)
+    }
+    if (onlySuccess) {
+      if (rec.count >= max) {
+        res.set('Retry-After', String(Math.ceil((rec.resetAt - now) / 1000)))
+        return res.status(429).json({ success: false, message })
+      }
+      res.on('finish', () => {
+        if (res.statusCode < 400) rec.count++
+      })
+      return next()
     }
     rec.count++
     if (rec.count > max) {

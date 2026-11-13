@@ -179,7 +179,7 @@ export default function POS() {
     }
   }
 
-  const formatPrice = (p) => new Intl.NumberFormat('uz-UZ').format(p) + " so'm"
+  const formatPrice = (p) => new Intl.NumberFormat('ru-RU').format(p) + " so'm"
 
   return (
     <div className="space-y-4 animate-fade-in pb-8">

@@ -17,10 +17,16 @@ import {
 import api from '../services/api'
 import sounds from '../utils/audio'
 
-export default function AIAdvisor() {
-  const [isOpen, setIsOpen] = useState(false)
-  const [messages, setMessages] = useState([
-    {
+// **qalin** va *kursiv* — xavfsiz (HTML'siz) render
+function renderRich(text = '') {
+  return String(text)
+    .split(/(\*\*[^*]+\*\*)/g)
+    .map((part, i) =>
+      part.startsWith('**') && part.endsWith('**') ? <strong key={i}>{part.slice(2, -2)}</strong> : part.replace(/(^|\s)\*(\S)/g, '$1• $2')
+    )
+}
+
+const WELCOME = {
       id: 'welcome',
       sender: 'ai',
       text: "Assalomu alaykum! Men sizning **OsonBiznes AI Maslahatchi**ngizman. Do'koningiz savdosini tahlil qilish, ombordagi kam qolgan tovarlarni aniqlash yoki nasiya qarzlarini yig'ish bo'yicha yordam berishga tayyorman!",
@@ -31,8 +37,34 @@ export default function AIAdvisor() {
         "Daromadni 30% oshirish sirlari",
       ],
       time: new Date().toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }),
-    },
-  ])
+    }
+
+export default function AIAdvisor() {
+  const [isOpen, setIsOpen] = useState(false)
+  // Suhbat foydalanuvchi bo'yicha sessiya davomida saqlanadi (sahifa almashsa / yangilansa yo'qolmaydi)
+  const storeKey = (() => {
+    try {
+      return `ob_ai_chat_${JSON.parse(localStorage.getItem('user') || '{}').id || 'anon'}`
+    } catch {
+      return 'ob_ai_chat_anon'
+    }
+  })()
+  const [messages, setMessages] = useState(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(storeKey) || 'null')
+      if (Array.isArray(saved) && saved.length) return saved
+    } catch {
+      /* ignore */
+    }
+    return [WELCOME]
+  })
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(storeKey, JSON.stringify(messages.slice(-40)))
+    } catch {
+      /* storage to'la/bloklangan */
+    }
+  }, [messages, storeKey])
   const [inputText, setInputText] = useState('')
   const [loading, setLoading] = useState(false)
   const [metrics, setMetrics] = useState(null)
@@ -66,7 +98,8 @@ export default function AIAdvisor() {
     setLoading(true)
 
     try {
-      const data = await api.getAiAdvice(text, contextType)
+      const history = messages.filter(m => m.id !== 'welcome').slice(-10).map(m => ({ sender: m.sender, text: m.text }))
+      const data = await api.getAiAdvice(text, contextType, history)
       sounds.playSuccess()
       const aiMsg = {
         id: String(Date.now() + 1),
@@ -92,7 +125,7 @@ export default function AIAdvisor() {
     }
   }
 
-  const formatPrice = (p) => new Intl.NumberFormat('uz-UZ').format(p || 0) + " so'm"
+  const formatPrice = (p) => new Intl.NumberFormat('ru-RU').format(p || 0) + " so'm"
 
   return (
     <>
@@ -133,12 +166,23 @@ export default function AIAdvisor() {
                 </div>
               </div>
 
-              <button
-                onClick={() => setIsOpen(false)}
-                className="p-1.5 rounded-full hover:bg-white/20 text-white/80 hover:text-white transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setMessages([WELCOME])}
+                  aria-label="Yangi suhbat"
+                  title="Yangi suhbat"
+                  className="p-1.5 rounded-full hover:bg-white/20 text-white/80 hover:text-white transition"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setIsOpen(false)}
+                  aria-label="Yopish"
+                  className="p-1.5 rounded-full hover:bg-white/20 text-white/80 hover:text-white transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Quick Metrics Bar (if loaded) */}
@@ -173,7 +217,7 @@ export default function AIAdvisor() {
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-bl-xs border border-slate-200/60 dark:border-slate-700'
                     }`}
                   >
-                    <p className="whitespace-pre-line text-xs sm:text-sm leading-relaxed">{msg.text}</p>
+                    <p className="whitespace-pre-line text-xs sm:text-sm leading-relaxed">{renderRich(msg.text)}</p>
 
                     {/* Suggestions Buttons inside AI message */}
                     {msg.suggestions?.length > 0 && (

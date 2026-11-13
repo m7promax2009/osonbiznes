@@ -1,607 +1,437 @@
-import React, { useState } from 'react'
-import {
-  ShoppingBag,
-  X,
-  Trash2,
-  Plus,
-  Minus,
-  CheckCircle2,
-  Store,
-  MapPin,
-  Phone,
-  CreditCard,
-  Truck,
-  Building2,
-  Shield,
-  Smartphone,
-  Check,
-  AlertCircle,
-  ExternalLink,
-  Receipt,
-  Printer,
-  Package,
-  Info,
-} from 'lucide-react'
+import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react'
+import { ShoppingBag, X, Trash2, Plus, Minus, Check, Store, Truck, AlertCircle, ArrowLeft, Wallet, CreditCard, Smartphone, MapPin } from 'lucide-react'
 import api, { resolveImageUrl } from '../services/api'
 import sounds from '../utils/audio'
 import { toast } from './Toast'
 
-export default function MarketplaceCartModal({
-  isOpen,
-  onClose,
-  cart = [],
-  onUpdateQty,
-  onRemoveItem,
-  onClearCart,
-}) {
-  const [step, setStep] = useState(1) // 1: Cart Items, 2: Checkout Form & Payment, 3: Success Receipt
-  const [form, setForm] = useState({
-    customer: '',
-    phone: '+998 ',
-    address: '',
-    deliveryMethod: 'delivery', // pickup | delivery
-    paymentMethod: 'cash', // cash | card | click | payme
-    cardNumber: '',
-    expiry: '',
-    cardHolder: '',
-    otp: '',
-  })
-  const [generatedOtp, setGeneratedOtp] = useState('')
+const LocationPicker = lazy(() => import('./LocationPicker'))
+
+// Viloyat markazlari (xaritani boshlash uchun)
+const REGIONS = [
+  ['Toshkent shahri', 41.3111, 69.2797],
+  ['Toshkent viloyati', 41.0, 69.6],
+  ['Andijon', 40.7821, 72.3442],
+  ['Buxoro', 39.7681, 64.4556],
+  ["Farg'ona", 40.3864, 71.7864],
+  ['Jizzax', 40.1158, 67.8422],
+  ['Xorazm', 41.55, 60.6333],
+  ['Namangan', 40.9983, 71.6726],
+  ['Navoiy', 40.0844, 65.3792],
+  ['Qashqadaryo', 38.8606, 65.7975],
+  ["Qoraqalpog'iston", 42.4611, 59.6166],
+  ['Samarqand', 39.6542, 66.9597],
+  ['Sirdaryo', 40.4897, 68.7842],
+  ['Surxondaryo', 37.2242, 67.2783],
+]
+const TASHKENT_DISTRICTS = ['Bektemir', 'Chilonzor', 'Mirobod', "Mirzo Ulug'bek", 'Olmazor', 'Sergeli', 'Shayxontohur', 'Uchtepa', 'Yakkasaroy', 'Yangihayot', 'Yashnobod', 'Yunusobod']
+
+const PAY = [
+  { key: 'cash', label: 'Naqd', icon: Wallet },
+  { key: 'card', label: 'Karta', icon: CreditCard },
+  { key: 'click', label: 'Click / Payme', icon: Smartphone },
+]
+
+const fmt = (p) => new Intl.NumberFormat('ru-RU').format(p || 0) + " so'm"
+// Faqat raqam; 998 bilan yopishtirilsa — prefiks olib tashlanadi; maksimal 9 ta
+const onlyPhoneDigits = (v) => {
+  let d = String(v || '').replace(/\D/g, '')
+  if (d.length > 9 && d.startsWith('998')) d = d.slice(3)
+  return d.slice(0, 9)
+}
+const prettyPhone = (d) => [d.slice(0, 2), d.slice(2, 5), d.slice(5, 7), d.slice(7, 9)].filter(Boolean).join(' ')
+
+const fieldCls = 'w-full h-12 rounded-xl border border-slate-300 bg-white px-3.5 text-[15px] text-[#111827] placeholder:text-slate-400 outline-none focus:border-[#10B981] focus:ring-4 focus:ring-[#D1FAE5] transition'
+const labelCls = 'block text-sm font-medium text-slate-700 mb-1.5'
+
+const EMPTY_ADDR = { city: 'Toshkent shahri', district: '', street: '', house: '', apartment: '', landmark: '' }
+
+export default function MarketplaceCartModal({ isOpen, onClose, cart = [], onUpdateQty, onRemoveItem, onClearCart }) {
+  const [step, setStep] = useState(1) // 1 savat, 2 rasmiylashtirish, 3 tayyor
+  const [customer, setCustomer] = useState('')
+  const [phone, setPhone] = useState('')
+  const [delivery, setDelivery] = useState('delivery')
+  const [pay, setPay] = useState('cash')
+  const [addr, setAddr] = useState(EMPTY_ADDR)
+  const [location, setLocation] = useState(null)
+  const [touched, setTouched] = useState(false)
   const [processing, setProcessing] = useState(false)
-  const [orderResults, setOrderResults] = useState([])
+  const [results, setResults] = useState([])
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!isOpen) return undefined
+    const onEsc = (e) => e.key === 'Escape' && onClose()
+    document.addEventListener('keydown', onEsc)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onEsc)
+      document.body.style.overflow = prev
+    }
+  }, [isOpen, onClose])
+
+  useEffect(() => {
+    if (isOpen && step === 3 && cart.length) setStep(1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen])
+
+  const groups = useMemo(() => {
+    const g = {}
+    cart.forEach((i) => {
+      const id = i.shopId || 'unknown'
+      ;(g[id] ||= { shopName: i.shopName || "Do'kon", items: [] }).items.push(i)
+    })
+    return g
+  }, [cart])
+
+  const regionCenter = useMemo(() => {
+    const r = REGIONS.find((x) => x[0] === addr.city)
+    return r ? { lat: r[1], lng: r[2] } : null
+  }, [addr.city])
 
   if (!isOpen) return null
 
-  const formatPrice = (p) => new Intl.NumberFormat('uz-UZ').format(p || 0) + " so'm"
+  const shopCount = Object.keys(groups).length
+  const total = cart.reduce((s, i) => s + i.price * i.qty, 0)
+  const count = cart.reduce((s, i) => s + i.qty, 0)
+  const setA = (k) => (e) => setAddr((a) => ({ ...a, [k]: e.target.value }))
 
-  // Group items by shopId
-  const itemsByShop = cart.reduce((acc, item) => {
-    const sId = item.shopId || 'unknown'
-    if (!acc[sId]) {
-      acc[sId] = {
-        shopName: item.shopName || "OsonBiznes Do'koni",
-        items: [],
-      }
-    }
-    acc[sId].items.push(item)
-    return acc
-  }, {})
-
-  const shopCount = Object.keys(itemsByShop).length
-  const deliveryPerShop = 20000
-  const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0)
-  const deliveryFee = form.deliveryMethod === 'delivery' ? (deliveryPerShop * shopCount) : 0
-  const grandTotal = cartTotal + deliveryFee
-
-  const handleCardNumberChange = (e) => {
-    let val = e.target.value.replace(/\D/g, '').slice(0, 16)
-    val = val.replace(/(\d{4})(?=\d)/g, '$1 ')
-    setForm(prev => ({ ...prev, cardNumber: val }))
+  // Tekshiruv
+  const errs = {}
+  if (customer.trim().length < 2) errs.customer = 'Ismingizni yozing'
+  if (phone.length !== 9) errs.phone = 'Raqam 9 ta raqamdan iborat: 90 123 45 67'
+  if (delivery === 'delivery') {
+    if (!addr.district.trim()) errs.district = 'Tumanni tanlang'
+    if (addr.street.trim().length < 3) errs.street = "Ko'cha yoki mahalla nomini yozing"
+    if (!addr.house.trim()) errs.house = 'Uy raqami'
+    if (!location) errs.location = 'Xaritada yetkazish nuqtasini belgilang'
   }
+  const err = (k) => touched && errs[k]
 
-  const handleExpiryChange = (e) => {
-    let val = e.target.value.replace(/\D/g, '').slice(0, 4)
-    if (val.length >= 2) {
-      val = val.slice(0, 2) + '/' + val.slice(2)
-    }
-    setForm(prev => ({ ...prev, expiry: val }))
-  }
-
-  const handleSendCardOtp = () => {
-    const cleanCard = form.cardNumber.replace(/\s+/g, '')
-    if (cleanCard.length < 16) {
-      toast.error("Karta raqamini to'liq (16 ta raqam) kiriting")
-      return false
-    }
-    if (form.expiry.length < 5) {
-      toast.error("Karta amal qilish muddatini to'liq kiriting (OO/YY)")
-      return false
-    }
-    const otp = Math.floor(100000 + Math.random() * 900000).toString()
-    setGeneratedOtp(otp)
-    setForm(prev => ({ ...prev, otp }))
-    sounds.playSuccess()
-    toast.success(`SMS tasdiqlash kodi: ${otp}`)
-    return true
-  }
-
-  const handlePlaceOrder = async (e) => {
+  const submit = async (e) => {
     e.preventDefault()
+    setTouched(true)
     setError('')
-
-    if (!form.customer.trim() || form.phone.trim().length < 9) {
-      setError("Iltimos, ismingiz va to'liq telefon raqamingizni kiriting")
+    if (Object.keys(errs).length) {
+      setError(errs.location && Object.keys(errs).length === 1 ? errs.location : "Belgilangan maydonlarni to'ldiring")
+      // Birinchi xato maydonga olib boramiz
+      setTimeout(() => {
+        const first = document.querySelector('[aria-invalid="true"]') || document.querySelector('.leaflet-container')
+        first?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        if (first?.focus && first.tagName !== 'DIV') first.focus({ preventScroll: true })
+      }, 0)
       return
     }
-
-    if (form.paymentMethod === 'card' && !form.otp) {
-      const ok = handleSendCardOtp()
-      if (!ok) return
-    }
-
     setProcessing(true)
-
-    try {
-      sounds.playClick()
-      const createdOrders = []
-
-      // Submit an order for each shop represented in cart
-      for (const [shopId, shopData] of Object.entries(itemsByShop)) {
-        const shopItems = shopData.items.map(i => ({
-          productId: i.productId || i._id,
-          name: i.name,
-          qty: i.qty,
-          price: i.price,
-        }))
-
-        const shopItemsTotal = shopItems.reduce((s, i) => s + (i.price * i.qty), 0)
-        const shopOrderTotal = shopItemsTotal + (form.deliveryMethod === 'delivery' ? deliveryPerShop : 0)
-
+    sounds.playClick()
+    const created = []
+    const failed = []
+    for (const [shopId, g] of Object.entries(groups)) {
+      try {
         const res = await api.request('/telegram/order', {
           method: 'POST',
           body: {
-            customer: form.customer.trim(),
-            phone: form.phone.trim(),
-            items: shopItems,
-            total: shopOrderTotal,
-            source: 'marketplace_cart',
+            customer: customer.trim(),
+            phone: `+998${phone}`,
+            items: g.items.map((i) => ({ productId: i.productId || i._id, name: i.name, qty: i.qty })),
+            source: 'website',
             ownerId: shopId,
-            address: form.address.trim(),
-            deliveryMethod: form.deliveryMethod,
-            paymentMethod: form.paymentMethod,
-            paymentStatus: form.paymentMethod === 'card' ? 'paid' : 'unpaid',
+            deliveryMethod: delivery,
+            paymentMethod: pay,
+            ...(delivery === 'delivery' ? { addressDetails: addr, location } : {}),
           },
         })
-
-        createdOrders.push({
-          shopName: shopData.shopName,
-          orderId: res.data?.orderNumber || res.data?.orderId || `ORD-${Math.floor(1000 + Math.random() * 9000)}`,
-          total: shopOrderTotal,
-          itemsCount: shopItems.reduce((s, i) => s + i.qty, 0),
-          delivery: form.deliveryMethod === 'delivery' ? 'Kuryer orqali yetkazish' : 'Do\'kondan olib ketish',
-        })
+        created.push({ shopName: g.shopName, orderId: res.data?.orderNumber || res.data?.orderId, total: res.data?.total ?? 0 })
+        g.sent = true
+      } catch (err2) {
+        failed.push(`${g.shopName}: ${err2.message}`)
       }
-
-      sounds.playCashChing()
-      setOrderResults(createdOrders)
-      onClearCart()
-      setStep(3)
-      toast.success("Barcha do'konlarga buyurtma muvaffaqiyatli yuborildi!")
-    } catch (err) {
-      setError(err.message || "Buyurtma berishda xatolik yuz berdi")
-    } finally {
-      setProcessing(false)
     }
+    setProcessing(false)
+    if (!created.length) {
+      setError(failed.join('\n') || 'Buyurtma yuborilmadi')
+      return
+    }
+    sounds.playCashChing()
+    setResults(created)
+    if (!failed.length) onClearCart()
+    else Object.values(groups).filter((g) => g.sent).forEach((g) => g.items.forEach((i) => onRemoveItem(i.productId || i._id)))
+    setStep(3)
+    if (failed.length) toast.error(`Ba'zi do'konlarga yuborilmadi:\n${failed.join('\n')}`)
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-xl max-h-[90vh] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden animate-scale-in">
-        {/* Modal Header */}
-        <div className="p-5 bg-gradient-to-r from-emerald-600 to-teal-700 text-white flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center text-white">
-              <ShoppingBag className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-extrabold text-base">
-                {step === 1 ? 'Xarid Savati' : step === 2 ? 'Buyurtma & To\'lov' : 'Buyurtmalar Qabul Qilindi'}
-              </h3>
-              <p className="text-xs text-emerald-100">
-                {step === 1 ? `${shopCount} ta do'kondan ${cart.reduce((s, i) => s + i.qty, 0)} ta tovar` : 'OsonBozor Xavfsiz Xarid'}
-              </p>
-            </div>
-          </div>
+  const title = step === 1 ? 'Savat' : step === 2 ? 'Buyurtmani rasmiylashtirish' : 'Buyurtma yuborildi'
 
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-white/20 text-white/80 hover:text-white transition"
-          >
+  return (
+    <div className="fixed inset-0 z-[60]" role="dialog" aria-modal="true" aria-label={title}>
+      <div className="absolute inset-0 bg-[#111827]/50 animate-fade-in" onClick={onClose} />
+      <aside className="absolute right-0 top-0 h-full w-full sm:w-[34rem] bg-white shadow-2xl flex flex-col drawer-in">
+        <header className="h-16 shrink-0 px-4 sm:px-6 flex items-center gap-3 border-b border-slate-200">
+          {step === 2 && (
+            <button type="button" onClick={() => setStep(1)} aria-label="Savatga qaytish" className="w-9 h-9 -ml-1 rounded-full flex items-center justify-center hover:bg-slate-100">
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+          )}
+          <h2 className="font-display font-bold text-lg text-[#111827] flex-1 truncate">{title}</h2>
+          <button type="button" onClick={onClose} aria-label="Yopish" className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-slate-100">
             <X className="w-5 h-5" />
           </button>
-        </div>
+        </header>
 
-        {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
-          {error && (
-            <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-xs font-bold text-red-600 dark:text-red-400 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" /> {error}
-            </div>
-          )}
-
-          {/* STEP 1: CART ITEMS LIST GROUPED BY SHOP */}
-          {step === 1 && (
-            <div className="space-y-4">
+        {step === 1 && (
+          <>
+            <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-5">
               {cart.length === 0 ? (
-                <div className="py-14 text-center text-slate-400">
-                  <ShoppingBag className="w-14 h-14 mx-auto mb-3 opacity-20" />
-                  <h4 className="font-extrabold text-slate-700 dark:text-slate-200 text-sm">Savatingiz bo'sh</h4>
-                  <p className="text-xs text-slate-400 mt-1">Marketplace vitrinasidan mahsulotlarni tanlang</p>
+                <div className="py-20 text-center">
+                  <span className="w-16 h-16 mx-auto rounded-2xl bg-[#ECFDF5] flex items-center justify-center">
+                    <ShoppingBag className="w-8 h-8 text-[#10B981]" />
+                  </span>
+                  <p className="mt-4 font-semibold text-[#111827]">Savat bo'sh</p>
+                  <p className="text-sm text-slate-500 mt-1">Mahsulot kartochkasidagi "Savatga" tugmasini bosing.</p>
+                  <button type="button" onClick={onClose} className="mt-6 h-11 px-6 rounded-xl bg-[#047857] text-white font-semibold">
+                    Xaridni boshlash
+                  </button>
                 </div>
               ) : (
-                <>
-                  {/* Notice if multiple shops */}
+                <div className="space-y-6">
                   {shopCount > 1 && (
-                    <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-500/20 rounded-2xl flex items-start gap-2.5 text-xs text-amber-800 dark:text-amber-300">
-                      <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                      <div>
-                        <span className="font-bold">Eslatma:</span> Siz <strong>{shopCount} ta turli do'kon</strong>dan tovar tanladingiz. Har bir do'kon o'z tovarini o'z omboridan mustaqil qadoqlab, kuryer orqali yuboradi.
-                      </div>
-                    </div>
+                    <p className="text-sm text-slate-600 bg-[#E0F2FE] rounded-xl px-3.5 py-2.5">
+                      {shopCount} ta do'kondan tanladingiz — har bir do'kon o'z buyurtmasini alohida yuboradi.
+                    </p>
                   )}
-
-                  {/* Groups of Shops */}
-                  <div className="space-y-4">
-                    {Object.entries(itemsByShop).map(([shopId, shopData], sIdx) => {
-                      const shopSum = shopData.items.reduce((s, i) => s + (i.price * i.qty), 0)
-                      return (
-                        <div
-                          key={shopId}
-                          className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 space-y-3"
-                        >
-                          {/* Shop header pill */}
-                          <div className="flex items-center justify-between pb-2 border-b border-slate-200/70 dark:border-slate-700">
-                            <div className="flex items-center gap-2">
-                              <span className="w-5 h-5 rounded-md bg-emerald-500 text-white text-[10px] font-extrabold flex items-center justify-center">
-                                {sIdx + 1}
+                  {Object.entries(groups).map(([sid, g]) => (
+                    <section key={sid}>
+                      <h3 className="text-sm font-semibold text-[#111827] flex items-center gap-1.5 mb-2">
+                        <Store className="w-4 h-4 text-[#10B981]" aria-hidden="true" /> {g.shopName}
+                      </h3>
+                      <ul className="divide-y divide-slate-100">
+                        {g.items.map((i) => {
+                          const id = i.productId || i._id
+                          return (
+                            <li key={id} className="py-3 flex gap-3">
+                              <span className="w-16 h-16 rounded-xl bg-[#F3F4F6] overflow-hidden shrink-0">
+                                {i.images?.[0] && <img src={resolveImageUrl(i.images[0])} alt="" className="w-full h-full object-contain p-1.5 mix-blend-multiply" />}
                               </span>
-                              <span className="text-xs font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-1">
-                                <Store className="w-3.5 h-3.5 text-emerald-600" /> {shopData.shopName}
-                              </span>
-                            </div>
-                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                              {formatPrice(shopSum)}
-                            </span>
-                          </div>
-
-                          {/* Items in this shop */}
-                          <div className="space-y-2.5">
-                            {shopData.items.map((item) => (
-                              <div
-                                key={item.productId || item._id}
-                                className="flex items-center gap-3 p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-xs"
-                              >
-                                <div className="w-12 h-12 rounded-lg bg-slate-100 dark:bg-slate-800 overflow-hidden shrink-0">
-                                  {item.images?.[0] ? (
-                                    <img src={resolveImageUrl(item.images[0])} alt={item.name} className="w-full h-full object-cover" />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs font-bold">📦</div>
-                                  )}
-                                </div>
-
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">{item.name}</h4>
-                                  <p className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
-                                    {formatPrice(item.price)}
-                                  </p>
-                                </div>
-
-                                <div className="flex items-center gap-1.5 shrink-0 bg-slate-50 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
-                                  <button
-                                    onClick={() => onUpdateQty(item.productId || item._id, -1)}
-                                    className="w-5 h-5 rounded bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 flex items-center justify-center text-xs font-bold shadow-xs hover:bg-slate-100"
-                                  >
-                                    <Minus className="w-2.5 h-2.5" />
-                                  </button>
-                                  <span className="text-xs font-bold w-4 text-center text-slate-800 dark:text-slate-100">
-                                    {item.qty}
-                                  </span>
-                                  <button
-                                    onClick={() => onUpdateQty(item.productId || item._id, 1)}
-                                    className="w-5 h-5 rounded bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 flex items-center justify-center text-xs font-bold shadow-xs hover:bg-slate-100"
-                                  >
-                                    <Plus className="w-2.5 h-2.5" />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm text-[#111827] line-clamp-2">{i.name}</p>
+                                <p className="mt-0.5 font-semibold text-[#111827]">{fmt(i.price * i.qty)}</p>
+                                <div className="mt-2 flex items-center gap-2">
+                                  <div className="flex items-center h-8 rounded-lg border border-slate-200">
+                                    <button type="button" onClick={() => onUpdateQty(id, -1)} aria-label="Kamaytirish" className="w-8 h-full flex items-center justify-center hover:bg-slate-50">
+                                      <Minus className="w-3.5 h-3.5" />
+                                    </button>
+                                    <span className="w-7 text-center text-sm font-semibold tabular-nums">{i.qty}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => onUpdateQty(id, 1)}
+                                      disabled={i.stock != null && i.qty >= i.stock}
+                                      aria-label="Ko'paytirish"
+                                      className="w-8 h-full flex items-center justify-center hover:bg-slate-50 disabled:opacity-30"
+                                    >
+                                      <Plus className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                  <button type="button" onClick={() => onRemoveItem(id)} aria-label="O'chirish" className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-[#B91C1C] hover:bg-red-50">
+                                    <Trash2 className="w-4 h-4" />
                                   </button>
                                 </div>
-
-                                <button
-                                  onClick={() => onRemoveItem(item.productId || item._id)}
-                                  className="p-1.5 text-slate-400 hover:text-rose-500 rounded-md transition"
-                                  title="O'chirish"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
                               </div>
-                            ))}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  {/* Summary Box */}
-                  <div className="p-4 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/30 border border-emerald-500/20 flex items-center justify-between">
-                    <div>
-                      <span className="text-xs text-slate-500 dark:text-slate-400">Jami Savat Summasi:</span>
-                      <p className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400">{formatPrice(cartTotal)}</p>
-                    </div>
-                    <button
-                      onClick={() => {
-                        sounds.playClick()
-                        setStep(2)
-                      }}
-                      className="btn-primary px-5 py-3 font-bold text-xs shadow-md"
-                    >
-                      Buyurtmaga O'tish →
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* STEP 2: CHECKOUT & PAYMENT METHOD */}
-          {step === 2 && (
-            <form onSubmit={handlePlaceOrder} className="space-y-4">
-              {/* Delivery Choice */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-                  Yetkazib Berish Usuli
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setForm({ ...form, deliveryMethod: 'delivery' })}
-                    className={`p-3 rounded-2xl border text-left transition flex items-center gap-2.5 ${
-                      form.deliveryMethod === 'delivery'
-                        ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/40 font-bold text-emerald-900 dark:text-emerald-200'
-                        : 'border-slate-200 dark:border-slate-700 text-slate-600'
-                    }`}
-                  >
-                    <Truck className="w-4 h-4 text-emerald-600" />
-                    <div>
-                      <p className="text-xs">Kuryer orqali yetkazish</p>
-                      <p className="text-[10px] text-slate-400 font-normal">
-                        {shopCount > 1 ? `${shopCount} ta do'kon: ${formatPrice(deliveryPerShop * shopCount)}` : `${formatPrice(deliveryPerShop)}`}
-                      </p>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setForm({ ...form, deliveryMethod: 'pickup' })}
-                    className={`p-3 rounded-2xl border text-left transition flex items-center gap-2.5 ${
-                      form.deliveryMethod === 'pickup'
-                        ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/40 font-bold text-emerald-900 dark:text-emerald-200'
-                        : 'border-slate-200 dark:border-slate-700 text-slate-600'
-                    }`}
-                  >
-                    <Store className="w-4 h-4 text-slate-500" />
-                    <div>
-                      <p className="text-xs">Do'kondan olib ketish</p>
-                      <p className="text-[10px] text-slate-400 font-normal">Bepul (0 so'm)</p>
-                    </div>
-                  </button>
-                </div>
-              </div>
-
-              {/* Customer Inputs */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
-                    Ismingiz
-                  </label>
-                  <input
-                    required
-                    type="text"
-                    value={form.customer}
-                    onChange={e => setForm({ ...form, customer: e.target.value })}
-                    placeholder="Masalan: Sardor Aliyev"
-                    className="input-field text-xs font-bold"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
-                    Telefon Raqamingiz
-                  </label>
-                  <input
-                    required
-                    type="tel"
-                    value={form.phone}
-                    onChange={e => setForm({ ...form, phone: e.target.value })}
-                    placeholder="+998 90 123 45 67"
-                    className="input-field text-xs font-bold font-mono"
-                  />
-                </div>
-              </div>
-
-              {form.deliveryMethod === 'delivery' && (
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
-                    Yetkazish Manzili (Shahar, tuman, ko'cha, uy)
-                  </label>
-                  <input
-                    required
-                    type="text"
-                    value={form.address}
-                    onChange={e => setForm({ ...form, address: e.target.value })}
-                    placeholder="Toshkent sh., Chilonzor 9, 12-uy"
-                    className="input-field text-xs"
-                  />
-                </div>
-              )}
-
-              {/* Payment Method Selector */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-                  To'lov Usuli
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { key: 'cash', label: '💵 Naqd Pul', desc: 'Qabul qilishda' },
-                    { key: 'card', label: '💳 Online Karta', desc: 'Uzcard / Humo' },
-                    { key: 'click', label: '📲 Click / Payme', desc: 'Ilova orqali' },
-                  ].map(pm => (
-                    <button
-                      key={pm.key}
-                      type="button"
-                      onClick={() => setForm({ ...form, paymentMethod: pm.key })}
-                      className={`p-2.5 rounded-xl border text-center transition ${
-                        form.paymentMethod === pm.key
-                          ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-extrabold shadow-xs'
-                          : 'border-slate-200 dark:border-slate-700 text-slate-600'
-                      }`}
-                    >
-                      <p className="text-xs">{pm.label}</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">{pm.desc}</p>
-                    </button>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    </section>
                   ))}
                 </div>
-              </div>
-
-              {/* If Card Payment is selected */}
-              {form.paymentMethod === 'card' && (
-                <div className="p-4 rounded-2xl bg-gradient-to-tr from-slate-900 via-slate-800 to-indigo-950 text-white space-y-3 animate-fade-in shadow-xl">
-                  <div className="flex items-center justify-between text-xs font-mono text-slate-400">
-                    <span>XAVFSIZ TO'LOV</span>
-                    <span className="text-emerald-400 font-bold">UZCARD / HUMO / VISA</span>
-                  </div>
-
-                  <div>
-                    <input
-                      required
-                      type="text"
-                      value={form.cardNumber}
-                      onChange={handleCardNumberChange}
-                      placeholder="8600 0000 0000 0000"
-                      className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-sm font-mono tracking-widest text-white placeholder-slate-400 focus:outline-none focus:border-emerald-400"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      required
-                      type="text"
-                      value={form.expiry}
-                      onChange={handleExpiryChange}
-                      placeholder="MM/YY"
-                      className="bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs font-mono text-white placeholder-slate-400 focus:outline-none focus:border-emerald-400"
-                    />
-                    <input
-                      type="text"
-                      value={form.cardHolder}
-                      onChange={e => setForm({ ...form, cardHolder: e.target.value.toUpperCase() })}
-                      placeholder="KARTA EGASI"
-                      className="bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs uppercase text-white placeholder-slate-400 focus:outline-none focus:border-emerald-400"
-                    />
-                  </div>
-
-                  {generatedOtp && (
-                    <div className="p-2.5 bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-center text-xs text-emerald-200">
-                      📲 SMS Kod: <strong className="text-white underline">{generatedOtp}</strong>
-                    </div>
-                  )}
-
-                  {generatedOtp && (
-                    <div>
-                      <input
-                        required
-                        type="text"
-                        maxLength={6}
-                        value={form.otp}
-                        onChange={e => setForm({ ...form, otp: e.target.value })}
-                        placeholder="6 xonali SMS kodni kiriting"
-                        className="w-full bg-white text-slate-900 font-mono text-center font-bold tracking-[0.3em] rounded-xl py-2 focus:outline-none"
-                      />
-                    </div>
-                  )}
+              )}
+            </div>
+            {cart.length > 0 && (
+              <footer className="shrink-0 border-t border-slate-200 px-4 sm:px-6 py-4" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+                <div className="flex items-baseline justify-between mb-3">
+                  <span className="text-sm text-slate-600">{count} ta mahsulot</span>
+                  <span className="font-display font-bold text-xl text-[#111827]">{fmt(total)}</span>
                 </div>
+                <button type="button" onClick={() => setStep(2)} className="w-full h-12 rounded-xl bg-[#047857] text-white font-semibold hover:bg-[#065F46] transition-colors">
+                  Rasmiylashtirishga o'tish
+                </button>
+              </footer>
+            )}
+          </>
+        )}
+
+        {step === 2 && (
+          <form onSubmit={submit} noValidate className="flex-1 flex flex-col min-h-0">
+            <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 space-y-6">
+              <fieldset>
+                <legend className="font-semibold text-[#111827] mb-2.5">Qanday olasiz?</legend>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { k: 'delivery', icon: Truck, t: 'Yetkazib berish', d: "Kuryer (Yandex Go va h.k.) — narxini kuryerga to'laysiz" },
+                    { k: 'pickup', icon: Store, t: "Do'kondan olish", d: 'Bepul, tayyor bo\'lganda xabar beriladi' },
+                  ].map((o) => (
+                    <label key={o.k} className={`cursor-pointer rounded-2xl border-2 p-3.5 transition-colors ${delivery === o.k ? 'border-[#10B981] bg-[#ECFDF5]' : 'border-slate-200 hover:border-slate-300'}`}>
+                      <input type="radio" name="delivery" value={o.k} checked={delivery === o.k} onChange={() => setDelivery(o.k)} className="sr-only" />
+                      <o.icon className={`w-5 h-5 ${delivery === o.k ? 'text-[#047857]' : 'text-slate-500'}`} aria-hidden="true" />
+                      <span className="block mt-2 text-sm font-semibold text-[#111827]">{o.t}</span>
+                      <span className="block mt-0.5 text-xs text-slate-500 leading-snug">{o.d}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
+              <fieldset className="space-y-3">
+                <legend className="font-semibold text-[#111827] mb-2.5">Qabul qiluvchi</legend>
+                <div>
+                  <label htmlFor="co-name" className={labelCls}>Ism</label>
+                  <input id="co-name" value={customer} onChange={(e) => setCustomer(e.target.value.slice(0, 60))} autoComplete="name" placeholder="Sardor" className={fieldCls} aria-invalid={!!err('customer')} />
+                  {err('customer') && <p className="mt-1 text-xs text-[#B91C1C]">{errs.customer}</p>}
+                </div>
+                <div>
+                  <label htmlFor="co-phone" className={labelCls}>Telefon</label>
+                  <div className={`flex items-center h-12 rounded-xl border bg-white focus-within:border-[#10B981] focus-within:ring-4 focus-within:ring-[#D1FAE5] transition ${err('phone') ? 'border-[#B91C1C]' : 'border-slate-300'}`}>
+                    <span className="pl-3.5 pr-2 text-[15px] font-medium text-slate-500 select-none">+998</span>
+                    <input
+                      id="co-phone"
+                      type="tel"
+                      inputMode="numeric"
+                      autoComplete="tel-national"
+                      value={prettyPhone(phone)}
+                      onChange={(e) => setPhone(onlyPhoneDigits(e.target.value))}
+                      onPaste={(e) => {
+                        e.preventDefault()
+                        setPhone(onlyPhoneDigits(e.clipboardData.getData('text')))
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key.length === 1 && !/\d/.test(e.key) && !e.metaKey && !e.ctrlKey) e.preventDefault()
+                      }}
+                      placeholder="90 123 45 67"
+                      maxLength={12}
+                      className="flex-1 min-w-0 h-full bg-transparent pr-3.5 text-[15px] tracking-wide text-[#111827] placeholder:text-slate-400 outline-none tabular-nums"
+                      aria-invalid={!!err('phone')}
+                    />
+                    <span className={`pr-3.5 text-xs tabular-nums ${phone.length === 9 ? 'text-[#047857]' : 'text-slate-400'}`}>{phone.length}/9</span>
+                  </div>
+                  {err('phone') && <p className="mt-1 text-xs text-[#B91C1C]">{errs.phone}</p>}
+                </div>
+              </fieldset>
+
+              {delivery === 'delivery' && (
+                <fieldset className="space-y-3">
+                  <legend className="font-semibold text-[#111827] mb-2.5">Yetkazish manzili</legend>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label htmlFor="co-city" className={labelCls}>Hudud</label>
+                      <select id="co-city" value={addr.city} onChange={(e) => setAddr((a) => ({ ...a, city: e.target.value, district: '' }))} className={fieldCls}>
+                        {REGIONS.map(([r]) => (
+                          <option key={r}>{r}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="co-district" className={labelCls}>Tuman</label>
+                      {addr.city === 'Toshkent shahri' ? (
+                        <select id="co-district" value={addr.district} onChange={setA('district')} className={fieldCls} aria-invalid={!!err('district')}>
+                          <option value="">Tanlang</option>
+                          {TASHKENT_DISTRICTS.map((d) => (
+                            <option key={d}>{d}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input id="co-district" value={addr.district} onChange={setA('district')} placeholder="Tuman yoki shahar" className={fieldCls} aria-invalid={!!err('district')} />
+                      )}
+                      {err('district') && <p className="mt-1 text-xs text-[#B91C1C]">{errs.district}</p>}
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="co-street" className={labelCls}>Ko'cha yoki mahalla</label>
+                    <input id="co-street" value={addr.street} onChange={setA('street')} autoComplete="address-line1" placeholder="Bunyodkor ko'chasi" className={fieldCls} aria-invalid={!!err('street')} />
+                    {err('street') && <p className="mt-1 text-xs text-[#B91C1C]">{errs.street}</p>}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label htmlFor="co-house" className={labelCls}>Uy</label>
+                      <input id="co-house" value={addr.house} onChange={setA('house')} placeholder="12" className={fieldCls} aria-invalid={!!err('house')} />
+                      {err('house') && <p className="mt-1 text-xs text-[#B91C1C]">{errs.house}</p>}
+                    </div>
+                    <div>
+                      <label htmlFor="co-apt" className={labelCls}>Xonadon <span className="text-slate-400 font-normal">(ixtiyoriy)</span></label>
+                      <input id="co-apt" value={addr.apartment} onChange={setA('apartment')} placeholder="45" className={fieldCls} />
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="co-landmark" className={labelCls}>Mo'ljal <span className="text-slate-400 font-normal">(ixtiyoriy)</span></label>
+                    <input id="co-landmark" value={addr.landmark} onChange={setA('landmark')} placeholder="Korzinka yonida, 3-podyezd" className={fieldCls} />
+                  </div>
+                  <div>
+                    <p className={labelCls}>
+                      <MapPin className="w-4 h-4 inline -mt-0.5 mr-1 text-[#F97362]" aria-hidden="true" />
+                      Xaritadagi nuqta — kuryer aynan shu yerga keladi
+                    </p>
+                    <Suspense fallback={<div className="h-56 sm:h-64 rounded-2xl bg-slate-100 animate-pulse" />}>
+                      <LocationPicker value={location} onChange={setLocation} center={regionCenter} />
+                    </Suspense>
+                    {location && <p className="mt-1.5 text-xs text-[#047857]">Nuqta belgilandi. Kerak bo'lsa markerni surib aniqlashtiring.</p>}
+                    {err('location') && <p className="mt-1.5 text-xs text-[#B91C1C]">{errs.location}</p>}
+                  </div>
+                </fieldset>
               )}
 
-              {/* Total & Submit */}
-              <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
-                <div className="flex justify-between text-xs text-slate-500">
-                  <span>Mahsulotlar ({cart.reduce((s, i) => s + i.qty, 0)} ta):</span>
-                  <span className="font-bold text-slate-800 dark:text-slate-200">{formatPrice(cartTotal)}</span>
+              <fieldset>
+                <legend className="font-semibold text-[#111827] mb-1">To'lov</legend>
+                <p className="text-xs text-slate-500 mb-2.5">Oldindan to'lov yo'q — mahsulotni olganingizda to'laysiz.</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {PAY.map((p) => (
+                    <label key={p.key} className={`cursor-pointer h-16 rounded-xl border-2 flex flex-col items-center justify-center gap-1 text-[13px] font-medium transition-colors ${pay === p.key ? 'border-[#10B981] bg-[#ECFDF5] text-[#047857]' : 'border-slate-200 text-slate-700 hover:border-slate-300'}`}>
+                      <input type="radio" name="pay" value={p.key} checked={pay === p.key} onChange={() => setPay(p.key)} className="sr-only" />
+                      <p.icon className="w-5 h-5" aria-hidden="true" />
+                      {p.label}
+                    </label>
+                  ))}
                 </div>
-                {form.deliveryMethod === 'delivery' && (
-                  <div className="flex justify-between text-xs text-slate-500">
-                    <span>Yetkazib berish ({shopCount} ta do'kon posilkasi):</span>
-                    <span className="font-bold text-slate-800 dark:text-slate-200">{formatPrice(deliveryFee)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-base font-extrabold text-slate-900 dark:text-slate-100 pt-1 border-t border-slate-100 dark:border-slate-800">
-                  <span>Jami To'lov:</span>
-                  <span className="text-emerald-600 dark:text-emerald-400">{formatPrice(grandTotal)}</span>
-                </div>
-
-                <div className="flex gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setStep(1)}
-                    className="btn-secondary flex-1 py-3 text-xs font-bold"
-                  >
-                    Savatga Qaytish
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={processing}
-                    className="btn-primary flex-2 py-3 text-xs font-extrabold flex items-center justify-center gap-2"
-                  >
-                    {processing ? (
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <>
-                        <CheckCircle2 className="w-4 h-4" /> Barcha Buyurtmalarni Tasdiqlash
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </form>
-          )}
-
-          {/* STEP 3: ORDER CONFIRMED RECEIPT */}
-          {step === 3 && (
-            <div className="text-center py-4 space-y-4 animate-fade-in">
-              <div className="w-16 h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center mx-auto shadow-xl shadow-emerald-500/30 animate-scale-in">
-                <Check className="w-9 h-9 stroke-[3]" />
-              </div>
-
-              <div>
-                <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-                  {orderResults.length} ta Do'konga Buyurtmalar Yuborildi
-                </span>
-                <h3 className="text-xl font-extrabold text-slate-900 dark:text-slate-100 mt-2">
-                  Rahmat, {form.customer}! 🎉
-                </h3>
-                <p className="text-xs text-slate-500 mt-1">
-                  Har bir do'kon o'z posilkasini qabul qildi va yetkazib berish uchun tayyorlaydi.
-                </p>
-              </div>
-
-              {/* Order Receipts Breakdown */}
-              <div className="space-y-2 text-left text-xs font-mono">
-                {orderResults.map((ord, idx) => (
-                  <div key={idx} className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-1.5">
-                    <div className="flex justify-between font-bold text-slate-800 dark:text-slate-200">
-                      <span>🏪 {ord.shopName}</span>
-                      <span className="text-emerald-600 dark:text-emerald-400">{formatPrice(ord.total)}</span>
-                    </div>
-                    <div className="flex justify-between text-slate-400 text-[11px]">
-                      <span>Buyurtma raqami: <strong>{ord.orderId}</strong></span>
-                      <span>{ord.itemsCount} ta tovar</span>
-                    </div>
-                    <div className="text-[10px] text-slate-500 pt-0.5">
-                      🚚 {ord.delivery}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="pt-2">
-                <button
-                  onClick={onClose}
-                  className="w-full btn-primary py-3 font-bold text-sm"
-                >
-                  Xaridni Davom Ettirish
-                </button>
-              </div>
+              </fieldset>
             </div>
-          )}
-        </div>
-      </div>
+
+            <footer className="shrink-0 border-t border-slate-200 px-4 sm:px-6 py-4 space-y-3" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+              {error && (
+                <p role="alert" className="text-sm text-[#B91C1C] flex items-start gap-1.5 whitespace-pre-line">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /> {error}
+                </p>
+              )}
+              <div className="flex items-baseline justify-between">
+                <span className="text-sm text-slate-600 min-w-0">{delivery === 'delivery' ? "Yetkazish alohida" : 'Jami'}</span>
+                <span className="font-display font-bold text-lg sm:text-xl text-[#111827] whitespace-nowrap">{fmt(total)}</span>
+              </div>
+              <button type="submit" disabled={processing} className="w-full h-12 rounded-xl bg-[#047857] text-white font-semibold hover:bg-[#065F46] disabled:opacity-60 transition-colors">
+                {processing ? 'Yuborilmoqda…' : shopCount > 1 ? `${shopCount} ta do'konga buyurtma berish` : 'Buyurtma berish'}
+              </button>
+            </footer>
+          </form>
+        )}
+
+        {step === 3 && (
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-10 text-center">
+            <span className="w-16 h-16 mx-auto rounded-full bg-[#10B981] text-white flex items-center justify-center animate-scale-in">
+              <Check className="w-9 h-9" strokeWidth={3} />
+            </span>
+            <h3 className="mt-5 font-display font-bold text-2xl text-[#111827]">Rahmat, {customer.trim().split(' ')[0]}!</h3>
+            <p className="mt-2 text-slate-600">Do'kon buyurtmani tasdiqlab, +998 {prettyPhone(phone)} raqamiga qo'ng'iroq qiladi.</p>
+            <ul className="mt-6 space-y-2 text-left">
+              {results.map((r) => (
+                <li key={r.orderId} className="rounded-2xl bg-[#F3F4F6] px-4 py-3 flex items-center justify-between gap-3">
+                  <span className="min-w-0">
+                    <span className="block font-semibold text-[#111827] truncate">{r.shopName}</span>
+                    <span className="block text-xs text-slate-500">Buyurtma #{r.orderId}</span>
+                  </span>
+                  <span className="font-semibold text-[#111827] shrink-0">{fmt(r.total)}</span>
+                </li>
+              ))}
+            </ul>
+            <button type="button" onClick={onClose} className="mt-8 w-full h-12 rounded-xl bg-[#047857] text-white font-semibold">
+              Xaridni davom ettirish
+            </button>
+          </div>
+        )}
+      </aside>
     </div>
   )
 }

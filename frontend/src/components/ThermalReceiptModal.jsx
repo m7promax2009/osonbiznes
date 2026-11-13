@@ -8,7 +8,7 @@ export default function ThermalReceiptModal({ order, onClose }) {
 
   if (!order) return null
 
-  const formattedPrice = (num) => new Intl.NumberFormat('uz-UZ').format(num || 0) + " so'm"
+  const formattedPrice = (num) => new Intl.NumberFormat('ru-RU').format(num || 0) + " so'm"
   const orderId = order._id || order.id || `ORD-${Math.floor(100000 + Math.random() * 900000)}`
   const dateStr = order.createdAt ? new Date(order.createdAt).toLocaleString('uz-UZ') : new Date().toLocaleString('uz-UZ')
 

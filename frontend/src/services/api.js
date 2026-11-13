@@ -49,7 +49,9 @@ class ApiService {
       const data = await response.json()
 
       if (!response.ok) {
-        if (response.status === 401) {
+        // Login/parol tiklash xatolari sahifani qayta yuklamasin (xabar ko'rinsin)
+        const isAuthForm = /^\/auth\/(login|register|forgot|reset)/.test(endpoint)
+        if (response.status === 401 && !isAuthForm) {
           this.clearToken()
           window.location.href = '/login'
         }
@@ -81,6 +83,27 @@ class ApiService {
       method: 'POST',
       body: userData,
     })
+    this.setToken(data.data.token)
+    localStorage.setItem('user', JSON.stringify(data.data.user))
+    return data.data
+  }
+
+  async verifyEmail(code) {
+    const data = await this.request('/auth/verify-email', { method: 'POST', body: { code } })
+    localStorage.setItem('user', JSON.stringify(data.data))
+    return data.data
+  }
+
+  async resendVerifyEmail() {
+    return this.request('/auth/verify-email/send', { method: 'POST' })
+  }
+
+  async forgotPassword(email) {
+    return this.request('/auth/forgot', { method: 'POST', body: { email } })
+  }
+
+  async resetPassword(email, code, newPassword) {
+    const data = await this.request('/auth/reset', { method: 'POST', body: { email, code, newPassword } })
     this.setToken(data.data.token)
     localStorage.setItem('user', JSON.stringify(data.data.user))
     return data.data
@@ -268,34 +291,11 @@ class ApiService {
     return data.data
   }
 
-  async selectTariff(tariff) {
-    const data = await this.request('/subscription/select', {
-      method: 'POST',
-      body: { tariff },
-    })
-    return data.data
-  }
-
-  async payTariff(tariffData) {
-    const data = await this.request('/subscription/pay', {
-      method: 'POST',
-      body: tariffData,
-    })
-    return data.data
-  }
-
-  async paySubscriptionCard(payload) {
-    const data = await this.request('/subscription/pay-card', {
+  // Obuna: qo'lda o'tkazma qilinganini bildirish (admin tasdiqlaydi)
+  async requestSubscription(payload) {
+    const data = await this.request('/subscription/request', {
       method: 'POST',
       body: payload,
-    })
-    return data.data
-  }
-
-  async confirmPayment(transactionId) {
-    const data = await this.request('/subscription/confirm', {
-      method: 'POST',
-      body: { transactionId },
     })
     return data.data
   }
@@ -390,27 +390,9 @@ class ApiService {
   }
 
   // Cards
-  async getCards() {
-    const data = await this.request('/cards')
-    return data.data
-  }
 
-  async addCard(cardData) {
-    const data = await this.request('/cards', {
-      method: 'POST',
-      body: cardData,
-    })
-    return data.data
-  }
 
-  async setDefaultCard(id) {
-    const data = await this.request(`/cards/${id}/default`, { method: 'PUT' })
-    return data.data
-  }
 
-  async deleteCard(id) {
-    await this.request(`/cards/${id}`, { method: 'DELETE' })
-  }
 
   // Notifications
   async getNotifications(params = {}) {
@@ -485,10 +467,10 @@ class ApiService {
   }
 
   // AI Business Advisor
-  async getAiAdvice(message = '', contextType = 'general') {
+  async getAiAdvice(message = '', contextType = 'general', history = []) {
     const data = await this.request('/ai/advisor', {
       method: 'POST',
-      body: { message, contextType },
+      body: { message, contextType, history },
     })
     return data.data
   }

@@ -3,8 +3,9 @@
 // Eslatma: modelda "bepul" (free) tarif yo'q — 14 kunlik trial uning o'rnida.
 const PLAN_LIMITS = {
   trial: { products: 200, customers: 500 }, // 14 kunlik to'liq sinov
-  start: { products: 50, customers: 100 },
-  pro: { products: 200, customers: 500 },
+  // Subscription.jsx dagi va'dalar bilan bir xil bo'lishi SHART
+  start: { products: 500, customers: 300 },
+  pro: { products: Infinity, customers: Infinity },
   business: { products: Infinity, customers: Infinity },
   blocked: { products: 0, customers: 0 },
 }
