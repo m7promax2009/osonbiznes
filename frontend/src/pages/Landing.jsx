@@ -12,6 +12,12 @@ import api from "../services/api";
 import ReceiptPrinter from "../components/ReceiptPrinter";
 import BrandMark from "../components/BrandMark";
 import LanguageSwitcher from "../components/LanguageSwitcher";
+import {
+  PullTag,
+  ParallaxProps,
+  useScenePalette,
+  updateParallax,
+} from "../components/LandingMotion";
 
 const fmt = (n) =>
   Number(n || 0)
@@ -190,7 +196,7 @@ const PLAN_CTA = {
 };
 
 const btnPrimary =
-  "btn-press inline-flex items-center justify-center whitespace-nowrap rounded-full bg-[#047857] text-white font-bold hover:bg-[#065F46] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#10B981]";
+  "btn-press inline-flex items-center justify-center whitespace-nowrap rounded-full scene-btn text-white font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#10B981]";
 
 // ---------- Sahifa ----------
 
@@ -199,6 +205,8 @@ export default function Landing() {
   const [yearly, setYearly] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const timelineRef = useRef(null);
+  const sceneRef = useRef(null);
+  useScenePalette(sceneRef);
   const [ledgerRef, ledgerIn] = useInView({ threshold: 0.35 });
 
   useEffect(() => {
@@ -224,6 +232,7 @@ export default function Landing() {
         const p = (window.innerHeight * 0.6 - r.top) / r.height;
         ol.style.setProperty("--p", String(Math.max(0, Math.min(1, p))));
       }
+      updateParallax(sceneRef.current);
     };
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(update);
@@ -241,7 +250,12 @@ export default function Landing() {
   const headline = "Do'kon hisobini daftar emas, ilova yuritsin.".split(" ");
 
   return (
-    <div className="font-body bg-[#F8FAFC] text-[#0F172A] min-h-screen">
+    <div
+      ref={sceneRef}
+      data-scene="hero"
+      data-motion={reducedMotion() ? "off" : "on"}
+      className="landing-scene font-body min-h-screen"
+    >
       {/* Navigatsiya: hero ustida shaffof, scrollda qattiq fon */}
       <header
         className={`landing-nav fixed inset-x-0 top-0 z-40 text-[#0F172A] transition-[background-color,box-shadow] duration-300 ${
@@ -289,10 +303,20 @@ export default function Landing() {
       </header>
 
       {/* Hero */}
-      <section className="auth-light text-[#0F172A] overflow-hidden relative">
+      <section
+        data-scene="hero"
+        className="auth-light text-[#0F172A] overflow-hidden relative"
+      >
         <span className="auth-blob auth-blob-a" aria-hidden="true" />
         <span className="auth-blob auth-blob-b" aria-hidden="true" />
         <span className="auth-blob auth-blob-c" aria-hidden="true" />
+        {/* Osilgan teg — o'ng ustun boshida, faqat katta ekranda */}
+        <div className="hidden lg:grid absolute inset-x-0 top-0 max-w-6xl mx-auto px-4 sm:px-6 grid-cols-[1.15fr_1fr] gap-14 pointer-events-none">
+          <div />
+          <div className="relative pointer-events-auto">
+            <PullTag />
+          </div>
+        </div>
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-28 pb-20 lg:pt-36 lg:pb-28 grid lg:grid-cols-[1.15fr_1fr] gap-14 items-center">
           <div>
             <h1 className="font-display font-extrabold text-[2.5rem] leading-[1.05] sm:text-6xl lg:text-[4.25rem] tracking-[-0.02em]">
@@ -356,8 +380,19 @@ export default function Landing() {
       {/* Do'kon kuni */}
       <section
         id="kun"
-        className="scroll-mt-16 max-w-6xl mx-auto px-4 sm:px-6 py-20 lg:py-28"
+        data-scene="kun"
+        className="px-host scroll-mt-16 max-w-6xl mx-auto px-4 sm:px-6 py-20 lg:py-28"
       >
+        <ParallaxProps
+          items={[
+            ["coin", 88, 6, 64, 0.45, -12],
+            ["receipt", 92, 38, 58, 0.3, 10],
+            ["coin", 70, 22, 30, 0.2, 0],
+            ["barcode", 84, 70, 72, 0.55, -8],
+            ["box", 62, 88, 36, 0.22, 14],
+            ["plane", 95, 55, 34, 0.25, 0],
+          ]}
+        />
         <Reveal>
           <h2 className="font-display font-bold text-3xl sm:text-4xl max-w-2xl leading-tight">
             Bir kun OsonBiznes bilan
@@ -388,13 +423,13 @@ export default function Landing() {
                   {time}
                 </p>
                 <h3 className="text-xl font-bold flex items-center gap-2">
-                  <Icon className="w-5 h-5 text-[#10B981]" aria-hidden="true" />{" "}
+                  <Icon className="w-5 h-5 scene-accent" aria-hidden="true" />{" "}
                   {title}
                 </h3>
                 <p className="mt-2 text-[#475569] leading-relaxed max-w-md">
                   {text}
                 </p>
-                <Link to={`/imkoniyatlar/${slug}`} className="mt-3 inline-block text-sm font-semibold text-[#047857] hover:underline">
+                <Link to={`/imkoniyatlar/${slug}`} className="mt-3 inline-block text-sm font-semibold scene-accent hover:underline">
                   Batafsil
                 </Link>
               </div>
@@ -409,8 +444,18 @@ export default function Landing() {
       {/* Nasiya daftari */}
       <section
         id="nasiya"
-        className="scroll-mt-16 bg-white border-y border-[#E2E8F0]"
+        data-scene="nasiya"
+        className="px-host scroll-mt-16 border-y border-black/5"
       >
+        <ParallaxProps
+          items={[
+            ["coin", 4, 12, 56, 0.5, 18],
+            ["coin", 8, 70, 32, 0.2, 0],
+            ["bag", 94, 14, 60, 0.4, 8],
+            ["receipt", 48, 86, 34, 0.22, -6],
+            ["coin", 90, 78, 40, 0.3, -20],
+          ]}
+        />
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-20 lg:py-28 grid lg:grid-cols-2 gap-12 items-center">
           <div
             ref={ledgerRef}
@@ -454,14 +499,14 @@ export default function Landing() {
               ].map((t) => (
                 <li key={t} className="flex gap-3">
                   <Check
-                    className="w-5 h-5 text-[#10B981] shrink-0 mt-0.5"
+                    className="w-5 h-5 scene-accent shrink-0 mt-0.5"
                     aria-hidden="true"
                   />
                   {t}
                 </li>
               ))}
             </ul>
-            <Link to="/nasiya" className="mt-6 inline-block font-semibold text-[#047857] hover:underline">
+            <Link to="/nasiya" className="mt-6 inline-block font-semibold scene-accent hover:underline">
               Nasiya daftari haqida batafsil
             </Link>
           </Reveal>
@@ -471,8 +516,17 @@ export default function Landing() {
       {/* Narxlar */}
       <section
         id="narxlar"
-        className="scroll-mt-16 max-w-6xl mx-auto px-4 sm:px-6 py-20 lg:py-28"
+        data-scene="narxlar"
+        className="px-host scroll-mt-16 max-w-6xl mx-auto px-4 sm:px-6 py-20 lg:py-28"
       >
+        <ParallaxProps
+          items={[
+            ["box", 2, 4, 58, 0.45, -10],
+            ["plane", 96, 8, 52, 0.5, 6],
+            ["coin", 30, 2, 28, 0.18, 0],
+            ["bag", 97, 70, 36, 0.24, -8],
+          ]}
+        />
         <Reveal className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
           <div>
             <h2 className="font-display font-bold text-3xl sm:text-4xl">
@@ -577,7 +631,7 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-[#ECFDF5] text-[#0F172A] border-t border-[#A7F3D0]">
+      <footer data-scene="narxlar" className="border-t border-black/5">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 lg:py-20">
           <Reveal className="flex flex-col md:flex-row md:items-center justify-between gap-8">
             <p className="font-display font-bold text-3xl sm:text-4xl max-w-xl leading-tight">
