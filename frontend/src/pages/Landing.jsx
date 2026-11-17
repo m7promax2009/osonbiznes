@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import api from "../services/api";
 import ReceiptPrinter from "../components/ReceiptPrinter";
+import ScrollStory from "../components/ScrollStory";
 import BrandMark from "../components/BrandMark";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import {
@@ -376,6 +377,9 @@ export default function Landing() {
           </div>
         </div>
       </section>
+
+      {/* 3D scroll hikoya */}
+      <ScrollStory />
 
       {/* Do'kon kuni */}
       <section

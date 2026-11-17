@@ -7,7 +7,9 @@
     @apply border-slate-200 dark:border-slate-800;
   }
   html, body {
+    /* clip: hidden'dan farqli scroll-container yaratmaydi, position:sticky ishlaydi */
     overflow-x: hidden;
+    overflow-x: clip;
   }
   body {
     @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 antialiased selection:bg-emerald-500 selection:text-white transition-colors duration-300;
@@ -544,4 +546,50 @@ html { scroll-behavior: smooth; }
   .landing-scene, .landing-scene * { transition-duration: 0s !important; }
   .px-layer { display: none; }
   .pull-tag-hint { animation: none; }
+}
+
+/* ---------- ScrollStory: sticky 3D hikoya ---------- */
+.story { position: relative; height: 620vh; }
+.story-stage {
+  position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden;
+  background-color: #f4f1ec; color: #10261c;
+}
+.story-canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; }
+.story-word {
+  position: absolute; left: 50%; top: 50%; z-index: 1; margin: 0;
+  display: flex; white-space: nowrap; pointer-events: none;
+  font-weight: 800; line-height: .82; letter-spacing: -0.05em;
+  font-size: min(23vw, 40vh); transform: translate3d(-50%, -50%, 0);
+  opacity: 0; visibility: hidden; will-change: transform, opacity;
+}
+.story-word span { display: inline-block; padding: 0 .02em; }
+.story-word-front { z-index: 3; }
+.story-nasiya {
+  position: absolute; inset: 0; z-index: 1; display: grid; grid-template-columns: 1fr 1fr; align-items: center;
+  column-gap: min(26vw, 34vh); font-weight: 800; letter-spacing: -0.05em; line-height: 1;
+  font-size: min(15vw, 26vh); color: #d4143a; pointer-events: none; opacity: 0; visibility: hidden;
+}
+.story-nasiya span { display: block; will-change: transform; }
+.story-nasiya span:first-child { justify-self: end; }
+.story-nasiya span:last-child { justify-self: start; }
+.story-copy { position: absolute; z-index: 4; opacity: 0; visibility: hidden; will-change: transform, opacity; }
+.story-copy-word { left: max(24px, 6vw); top: 15vh; }
+.story-copy-side { left: max(24px, 7vw); top: 50%; margin-top: -9rem; max-width: 30rem; }
+.story-copy-bottom { left: 0; right: 0; bottom: 9vh; text-align: center; padding: 0 24px; }
+.story-eyebrow { font-size: .78rem; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; opacity: .6; }
+.story-title { font-size: clamp(2.6rem, 6.4vw, 5.6rem); line-height: .98; letter-spacing: -0.03em; margin-top: .6rem; }
+.story-text { margin-top: 1rem; font-size: 1.1rem; line-height: 1.55; color: #334155; max-width: 26rem; }
+.story-copy-bottom .story-text { margin-left: auto; margin-right: auto; }
+.story-hint {
+  position: absolute; left: 0; right: 0; bottom: 7vh; z-index: 4; text-align: center;
+  font-size: .8rem; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: #64748b;
+}
+@media (max-aspect-ratio: 17/20) {
+  .story { height: 520vh; }
+  .story-copy-side { left: 20px; right: 20px; top: 11vh; margin-top: 0; text-align: center; max-width: none; }
+  .story-copy-side .story-text { margin-left: auto; margin-right: auto; font-size: 1rem; }
+  .story-title { font-size: clamp(2.2rem, 11vw, 3.4rem); }
+  .story-copy-word { left: 20px; right: 20px; top: 13vh; text-align: center; }
+  .story-nasiya { column-gap: 30vw; font-size: 12.5vw; }
+  .story-word { font-size: 21vw; }
 }
